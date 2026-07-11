@@ -4,21 +4,20 @@
 const SUPABASE_URL = 'https://bpleimrxzigbhpofavec.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwbGVpbXJ4emlnYmhwb2ZhdmVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3Njg5NjIsImV4cCI6MjA5OTM0NDk2Mn0.bElPIF6WLAqWUD9WQLea8pMsPeO3IZr4K-1kjeim5Gw';
 
-let supabase = null;
+let sbClient = null;
 
 try {
   if (typeof window.supabase !== 'undefined' && window.supabase && window.supabase.createClient) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   }
 } catch (e) {
   console.warn('Supabase init failed, using localStorage fallback:', e);
 }
 
-function sb(table) { return supabase ? supabase.from(table) : null; }
-// Retry once after a delay in case CDN loaded after script execution
+function sb(table) { return sbClient ? sbClient.from(table) : null; }
 setTimeout(() => {
-  if (!supabase && typeof window.supabase !== 'undefined' && window.supabase && window.supabase.createClient) {
-    try { supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) {}
+  if (!sbClient && typeof window.supabase !== 'undefined' && window.supabase && window.supabase.createClient) {
+    try { sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) {}
   }
 }, 1500);
 

@@ -28,7 +28,7 @@ let _rulesCache = null;
 
 async function getRules() {
   if (_rulesCache) return _rulesCache;
-  if (!supabase) return JSON.parse(localStorage.getItem('autoRules') || '[]');
+  if (!sbClient) return JSON.parse(localStorage.getItem('autoRules') || '[]');
   const { data } = await sb('auto_rules').select('*').order('id');
   _rulesCache = data || [];
   return _rulesCache;
@@ -39,8 +39,8 @@ function saveRules(r) {
   localStorage.setItem('autoRules', JSON.stringify(r));
 }
 
-async function syncRulesToSupabase() {
-  if (!supabase) return;
+async function syncRulesToBackend() {
+  if (!sbClient) return;
   const r = await getRules();
   await sb('auto_rules').delete().neq('id', 0);
   if (r.length) await sb('auto_rules').insert(r);
@@ -64,22 +64,22 @@ function applyRulesToProduct(product) {
 }
 
 // ==========================================
-// HELPERS: generic supabase fetch helpers
+// HELPERS: generic backend fetch helpers
 // ==========================================
 async function fetchAll(table) {
-  if (!supabase) return JSON.parse(localStorage.getItem(table) || '[]');
+  if (!sbClient) return JSON.parse(localStorage.getItem(table) || '[]');
   const { data } = await sb(table).select('*').order('id');
   return data || [];
 }
 
 async function upsertAll(table, rows) {
-  if (!supabase) { localStorage.setItem(table, JSON.stringify(rows)); return; }
+  if (!sbClient) { localStorage.setItem(table, JSON.stringify(rows)); return; }
   if (!rows.length) { await sb(table).delete().neq('id', 0); return; }
   await sb(table).upsert(rows, { onConflict: 'id' });
 }
 
 async function deleteAll(table) {
-  if (!supabase) { localStorage.setItem(table, '[]'); return; }
+  if (!sbClient) { localStorage.setItem(table, '[]'); return; }
   await sb(table).delete().neq('id', 0);
 }
 
@@ -206,7 +206,7 @@ if (cartList) {
         amount: total, status: 'Completed',
         date: new Date().toISOString().split('T')[0]
       };
-      if (!supabase) {
+      if (!sbClient) {
         const stored = JSON.parse(localStorage.getItem('posOrders') || '[]');
         stored.unshift(order);
         localStorage.setItem('posOrders', JSON.stringify(stored));
@@ -244,7 +244,7 @@ const monthlySalesValueEl = document.getElementById('monthlySalesValue');
 if (recentOrdersBody) {
   (async () => {
     let posOrders = [], completedOrders = [];
-    if (!supabase) {
+    if (!sbClient) {
       posOrders = JSON.parse(localStorage.getItem('posOrders') || '[]');
       completedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
     } else {
@@ -428,7 +428,7 @@ if (ordersContainer && filterTabs.length > 0) {
   const formatCurrency = (a) => '₱' + a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   (async () => {
-    if (!supabase) {
+    if (!sbClient) {
       onlineOrders = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
     } else {
       const { data } = await sb('online_orders').select('*').order('date', { ascending: false });
@@ -545,7 +545,7 @@ if (ordersContainer && filterTabs.length > 0) {
     if (idx === -1) return;
     const order = onlineOrders[idx];
     onlineOrders.splice(idx, 1);
-    if (!supabase) {
+    if (!sbClient) {
       const completed = JSON.parse(localStorage.getItem('completedOrders') || '[]');
       completed.unshift({ id: order.id, customer: order.customer, type: 'Online', amount: order.amount, status: 'Completed', date: new Date().toISOString().split('T')[0] });
       localStorage.setItem('completedOrders', JSON.stringify(completed));
@@ -637,7 +637,7 @@ if (rulesTableBody) {
       rules.push({ id: newId, direction, field, operator, value, adjustValue, adjustType, enabled });
     }
     saveRules(rules);
-    await syncRulesToSupabase();
+    await syncRulesToBackend();
     renderRules();
     renderImportedProducts();
     closeRuleModal();
@@ -669,7 +669,7 @@ if (rulesTableBody) {
     let rules = _rulesCache || [];
     rules = rules.filter(x => x.id !== id);
     saveRules(rules);
-    await syncRulesToSupabase();
+    await syncRulesToBackend();
     renderRules();
     renderImportedProducts();
   };

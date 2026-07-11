@@ -1,25 +1,26 @@
 // ==========================================
-// SUPABASE CLIENT INIT
+// SUPABASE CLIENT INIT (with fallback)
 // ==========================================
 const SUPABASE_URL = 'https://bpleimrxzigbhpofavec.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwbGVpbXJ4emlnYmhwb2ZhdmVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3Njg5NjIsImV4cCI6MjA5OTM0NDk2Mn0.bElPIF6WLAqWUD9WQLea8pMsPeO3IZr4K-1kjeim5Gw';
 
 let supabase = null;
 
-function initSupabase() {
-  if (supabase) return true;
-  if (typeof window.supabase !== 'undefined' && window.supabase) {
+try {
+  if (typeof window.supabase !== 'undefined' && window.supabase && window.supabase.createClient) {
     supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    return true;
   }
-  return false;
+} catch (e) {
+  console.warn('Supabase init failed, using localStorage fallback:', e);
 }
 
-initSupabase();
-
 function sb(table) { return supabase ? supabase.from(table) : null; }
-// Fallback: retry init after CDN finishes loading
-setTimeout(() => { if (!supabase) initSupabase(); }, 1000);
+// Retry once after a delay in case CDN loaded after script execution
+setTimeout(() => {
+  if (!supabase && typeof window.supabase !== 'undefined' && window.supabase && window.supabase.createClient) {
+    try { supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) {}
+  }
+}, 1500);
 
 // ==========================================
 // HELPERS: autoRules cache (in-memory + sync)

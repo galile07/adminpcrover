@@ -33,12 +33,8 @@
       <section class="page-content">
         <div class="section-heading">
           <h2>Pricing Rules</h2>
-          <div style="display:flex;gap:10px;">
-            <button class="btn btn-secondary" onclick="document.getElementById('excelInput').click()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">📥 Import Excel</button>
-            <button class="btn btn-primary" onclick="openAddRuleModal()">+ Add Rule</button>
-          </div>
+          <button class="btn btn-primary" onclick="openAddRuleModal()">+ Add Rule</button>
         </div>
-        <input type="file" id="excelInput" accept=".xlsx,.xls" style="display:none;" onchange="importExcel(event)">
 
         <div class="card table-card">
           <table>

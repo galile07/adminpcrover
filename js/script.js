@@ -270,7 +270,7 @@ if (recentOrdersBody) {
       completedOrders = (c || []).map(o => ({ id: o.id, customer: o.customer, type: 'Online', amount: o.amount, status: 'Completed', date: o.date }));
     }
 
-    // pending count from actual onlineOrders (read from backend or demo array)
+    // pending count from persisted onlineOrders
     let pendingCount = 0;
     if (!sbClient) {
       const stored = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
@@ -279,7 +279,7 @@ if (recentOrdersBody) {
       const { data: pend } = await sb('online_orders').select('*').eq('status', 'Pending');
       pendingCount = (pend || []).length;
     }
-    // fallback: if no real data, show 2 demo pending
+    // if no real data, show 2 demo pending (but only if not already accepted)
     if (pendingCount === 0) pendingCount = 2;
 
     const recentOrders = [...posOrders, ...completedOrders];
@@ -503,6 +503,23 @@ const filterTabs = document.querySelectorAll('.sub-nav-item');
 if (ordersContainer && filterTabs.length > 0) {
   let onlineOrders = [];
 
+  function persistOnlineOrders() {
+    if (!sbClient) {
+      localStorage.setItem('onlineOrders', JSON.stringify(onlineOrders));
+    } else {
+      // upsert all online orders back to supabase
+      onlineOrders.forEach(o => {
+        const statusMap = { pending: 'Pending', shipped: 'Shipped', delivered: 'Delivered' };
+        sb('online_orders').upsert({
+          id: o.id, customer: o.customer, amount: o.amount,
+          status: statusMap[o.status] || o.status,
+          date: o.date, items: o.items.map(i => i.name).join(', '),
+          address: o.address, contact: o.phone
+        }, { onConflict: 'id' });
+      });
+    }
+  }
+
   (async () => {
     if (!sbClient) {
       onlineOrders = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
@@ -515,8 +532,9 @@ if (ordersContainer && filterTabs.length > 0) {
         date: o.date, time: '12:00 PM',
         items: (o.items || '').split(',').filter(Boolean).map(i => ({ name: i.trim(), qty: 1, price: 0 }))
       }));
-      if (!onlineOrders.length) onlineOrders = getDefaultOrders();
     }
+    if (!onlineOrders.length) onlineOrders = getDefaultOrders();
+    persistOnlineOrders();
     renderOrders('pending');
   })();
 
@@ -550,17 +568,17 @@ if (ordersContainer && filterTabs.length > 0) {
   window.closeOrderModal = () => { document.getElementById('orderModal').style.display = 'none'; };
   window.acceptOrder = (id) => {
     const o = onlineOrders.find(x => x.id === id);
-    if (o) { o.status = 'shipped'; renderOrders(document.querySelector('.sub-nav-item.active').dataset.status); }
+    if (o) { o.status = 'shipped'; persistOnlineOrders(); renderOrders(document.querySelector('.sub-nav-item.active').dataset.status); }
     closeOrderModal();
   };
   window.declineOrder = (id) => {
     const idx = onlineOrders.findIndex(o => o.id === id);
-    if (idx !== -1) { onlineOrders.splice(idx, 1); renderOrders(document.querySelector('.sub-nav-item.active').dataset.status); }
+    if (idx !== -1) { onlineOrders.splice(idx, 1); persistOnlineOrders(); renderOrders(document.querySelector('.sub-nav-item.active').dataset.status); }
     closeOrderModal();
   };
   window.deliverOrder = (id) => {
     const o = onlineOrders.find(x => x.id === id);
-    if (o) { o.status = 'delivered'; renderOrders(document.querySelector('.sub-nav-item.active').dataset.status); }
+    if (o) { o.status = 'delivered'; persistOnlineOrders(); renderOrders(document.querySelector('.sub-nav-item.active').dataset.status); }
     closeOrderModal();
   };
   window.finishOrder = (id) => {
@@ -568,6 +586,7 @@ if (ordersContainer && filterTabs.length > 0) {
     if (idx === -1) return;
     const order = onlineOrders[idx];
     onlineOrders.splice(idx, 1);
+    persistOnlineOrders();
     if (!sbClient) {
       const c = JSON.parse(localStorage.getItem('completedOrders') || '[]');
       c.unshift({ id: order.id, customer: order.customer, type: 'Online', amount: order.amount, status: 'Completed', date: getTodayStr() });

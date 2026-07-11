@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PCROVER POS</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="layout-shell">
+    <aside class="sidebar">
+      <div class="login-brand">
+        <div class="brand-mark">PC</div>
+        <div>
+          <span class="brand-title">ROVER</span>
+          <span class="brand-sub">BALIUAG</span>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+        <a href="pos.html" class="nav-link active"><span>POS System</span></a>
+        <a href="orders.html" class="nav-link"><span>Online Orders</span></a>
+        <a href="inventory.html" class="nav-link"><span>Inventory</span></a>
+        <a href="automation.html" class="nav-link"><span>Price Automation</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <header class="header">
+        <div class="header-info">POS System</div>
+        <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
+      </header>
+      <section class="page-content">
+        <div class="pos-layout">
+          <div class="pos-products-section">
+            <div class="pos-search-bar">
+              <input type="text" id="posSearchInput" placeholder="Search products..." />
+              <span class="pos-search-icon">🔍</span>
+            </div>
+            <div class="pos-grid"></div>
+          </div>
+          <div class="pos-cart-section">
+            <div class="pos-cart-header">Current Order</div>
+            <div class="pos-cart-list"></div>
+            <div class="pos-cart-summary">
+              <div class="pos-summary-row"><span>Subtotal</span><span>₱0.00</span></div>
+              <div class="pos-summary-total"><span>Total</span><span>₱0.00</span></div>
+              <button class="btn-primary btn-checkout">Pay Out ₱0.00</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="js/script.js"></script>
+</body>
+</html>

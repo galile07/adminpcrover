@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PCROVER Admin Dashboard</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="page-dashboard">
+  <div class="layout-shell">
+    
+    <aside class="sidebar">
+      <div class="login-brand">
+        <div class="brand-mark">PC</div>
+        <div>
+          <span class="brand-title">ROVER</span>
+          <span class="brand-sub">BALIUAG</span>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="dashboard.html" class="nav-link active"><span>Dashboard</span></a>
+        <a href="pos.html" class="nav-link"><span>POS System</span></a>
+        <a href="orders.html" class="nav-link"><span>Online Orders</span></a>
+        <a href="inventory.html" class="nav-link"><span>Inventory</span></a>
+        <a href="automation.html" class="nav-link"><span>Price Automation</span></a>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      
+      <header class="header">
+        <div class="header-info">Dashboard</div>
+        <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
+      </header>
+
+      <section class="page-content">
+        <div class="section-heading">
+          <h2>Quick overview</h2>
+          <button class="btn btn-primary" onclick="location.href='orders.html'">Review orders</button>
+        </div>
+        <div class="card-row dashboard-stats">
+          <article class="card">
+            <strong>Recent orders</strong>
+            <p id="recentOrdersCount">0</p>
+            <span class="card-meta">Includes online and walk-in orders</span>
+          </article>
+          <article class="card">
+            <strong>Orders to accept</strong>
+            <p id="ordersToAcceptCount">0</p>
+            <span class="card-meta" id="ordersToAcceptMeta">0 pending confirmations</span>
+          </article>
+          <article class="card">
+            <strong>Daily sales</strong>
+            <p id="dailySalesValue">₱0.00</p>
+            <span class="card-meta">Sales captured today</span>
+          </article>
+          <article class="card">
+            <strong>Monthly sales</strong>
+            <p id="monthlySalesValue">₱0.00</p>
+            <span class="card-meta">Sales this month</span>
+          </article>
+          <article class="card">
+            <strong>Low-stock items</strong>
+            <p id="lowStockCount">0</p>
+            <span class="card-meta" id="lowStockMeta">Products under threshold</span>
+          </article>
+        </div>
+
+        <div class="section-heading" style="margin-top:2rem;">
+          <h2>Recent orders</h2>
+        </div>
+        <div class="card table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Order Code</th>
+                <th>Price</th>
+              </tr>
+            </thead>
+            <tbody id="recentOrdersBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="js/script.js"></script>
+</body>
+</html>

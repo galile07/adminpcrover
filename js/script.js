@@ -232,12 +232,7 @@ if (recentOrdersBody) {
     { id: '#0084', customer: 'Mark D.', type: 'Walk-in', amount: 2760, status: 'Completed', date: '2026-01-12' }
   ];
 
-  const pendingOrders = [
-    { id: '#0091', customer: 'Carlos G.', amount: 4300, status: 'Pending' },
-    { id: '#0089', customer: 'Rina C.', amount: 2480, status: 'Pending' },
-    { id: '#0088', customer: 'Ben T.', amount: 1320, status: 'Pending' },
-    { id: '#0087', customer: 'Arielle M.', amount: 5420, status: 'Pending' }
-  ];
+  const pendingOrders = []
 
   const invProducts = JSON.parse(localStorage.getItem('inventoryProducts') || '[]');
   const lowStockItems = invProducts.filter(p => p.enabled && p.stock <= p.threshold);
@@ -258,8 +253,8 @@ if (recentOrdersBody) {
     </tr>
   `).join('');
 
-  const dailySales = recentOrders.reduce((sum, order) => sum + order.amount, 0) + pendingOrders.reduce((sum, order) => sum + order.amount, 0);
-  const monthlySales = dailySales * 6 + 12500;
+  const dailySales = recentOrders.reduce((sum, order) => sum + order.amount, 0);
+  const monthlySales = dailySales * 6;
 
   recentOrdersCountEl.innerText = recentOrders.length;
   ordersToAcceptCountEl.innerText = pendingOrders.length;

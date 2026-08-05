@@ -212,8 +212,8 @@ if (cartList) {
     await getRules();
     const inv = await fetchAll('inventory');
     const imp = await fetchAll('imported_products');
-    const invCards = inv.filter(p => p.enabled).map(p => ({ name: p.name, price: p.price, image: productImage(p, 400), source: 'inventory', dataId: p.id }));
-    const impCards = imp.filter(p => p.enabled).map(p => ({ name: p.name, price: applyRulesToProduct(p), image: productImage(p, 400), source: 'imported', dataId: p.id }));
+    const invCards = inv.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: p.price, image: productImage(p, 400), source: 'inventory', dataId: p.id }));
+    const impCards = imp.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), image: productImage(p, 400), source: 'imported', dataId: p.id }));
     const all = [...invCards, ...impCards];
     posGrid.innerHTML = all.map(c =>
       '<div class="pos-item-card" data-name="' + c.name + '" data-price="' + c.price + '" data-source="' + c.source + '" data-id="' + c.dataId + '">' +
@@ -425,6 +425,14 @@ if (inventoryTableBody) {
     renderInv();
   };
 
+  function invStatusPill(p) {
+    if (!p.enabled) return '<span class="status-pill paused">Disabled</span>';
+    const st = p.stock || 0;
+    if (st <= 0) return '<span class="status-pill danger">Out of Stock</span>';
+    if (st <= (p.threshold || 5)) return '<span class="status-pill warn">Low Stock</span>';
+    return '<span class="status-pill active">In Stock</span>';
+  }
+
   async function renderInv() {
     const inv = await fetchInv();
     const imp = await fetchAll('imported_products');
@@ -446,7 +454,7 @@ if (inventoryTableBody) {
         '<td>' + (p.category || guessCategory(p.name)) + '</td>' +
         '<td>' + fmt(p.price) + '</td>' +
         '<td>' + p.stock + '</td>' +
-        '<td>' + (p.enabled ? '<span class="status-pill active">In Stock</span>' : '<span class="status-pill paused">Disabled</span>') + '</td>' +
+        '<td>' + invStatusPill(p) + '</td>' +
         '<td style="white-space:nowrap;text-align:center;">' +
           (p._src === 'imported'
             ? '<button class="btn-icon" onclick="editImportProduct(' + p.id + ')" title="Edit">Edit</button>'
@@ -842,7 +850,7 @@ if (rulesTableBody) {
     renderRules();
   })();
 
-  function ruleSign(r) { return r.direction === 'subtract' ? 'âˆ’' : '+'; }
+  function ruleSign() { return '+'; }
 
   function renderRules() {
     const rules = _rulesCache || [];
@@ -857,26 +865,24 @@ if (rulesTableBody) {
   window.openAddRuleModal = () => {
     document.getElementById('ruleModalTitle').textContent = 'Add Rule';
     document.getElementById('editRuleId').value = '';
-    document.getElementById('ruleDirection').value = 'add';
     document.getElementById('ruleField').value = 'stock';
     document.getElementById('ruleOperator').value = 'less';
     document.getElementById('ruleValue').value = '';
     document.getElementById('ruleAdjustValue').value = '';
     document.getElementById('ruleAdjustType').value = 'percent';
-    document.getElementById('ruleEnabled').checked = true;
     document.getElementById('ruleModal').style.display = 'flex';
   };
   window.closeRuleModal = () => { document.getElementById('ruleModal').style.display = 'none'; };
 
   window.saveRule = async () => {
     const id = document.getElementById('editRuleId').value;
-    const direction = document.getElementById('ruleDirection').value;
+    const direction = 'add';
     const field = document.getElementById('ruleField').value;
     const operator = document.getElementById('ruleOperator').value;
     const value = parseInt(document.getElementById('ruleValue').value);
     const adjustValue = parseFloat(document.getElementById('ruleAdjustValue').value);
     const adjustType = document.getElementById('ruleAdjustType').value;
-    const enabled = document.getElementById('ruleEnabled').checked;
+    const enabled = true;
     if (isNaN(value) || isNaN(adjustValue) || adjustValue <= 0) { alert('Please fill all fields.'); return; }
     const rules = _rulesCache || [];
     if (id) { const r = rules.find(x => x.id === parseInt(id)); if (r) { r.direction = direction; r.field = field; r.operator = operator; r.value = value; r.adjustValue = adjustValue; r.adjustType = adjustType; r.enabled = enabled; } }
@@ -888,13 +894,11 @@ if (rulesTableBody) {
     const rules = _rulesCache || []; const r = rules.find(x => x.id === id); if (!r) return;
     document.getElementById('ruleModalTitle').textContent = 'Edit Rule';
     document.getElementById('editRuleId').value = r.id;
-    document.getElementById('ruleDirection').value = r.direction || 'add';
     document.getElementById('ruleField').value = r.field;
     document.getElementById('ruleOperator').value = r.operator;
     document.getElementById('ruleValue').value = r.value;
     document.getElementById('ruleAdjustValue').value = r.adjustValue;
     document.getElementById('ruleAdjustType').value = r.adjustType;
-    document.getElementById('ruleEnabled').checked = r.enabled;
     document.getElementById('ruleModal').style.display = 'flex';
   };
 

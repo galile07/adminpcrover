@@ -89,10 +89,7 @@
                   <label>Price Adjustment</label>
                   <div class="form-row">
                     <div class="form-group" style="flex:0.4;">
-                      <select id="ruleDirection" class="form-input">
-                        <option value="add">+</option>
-                        <option value="subtract">-</option>
-                      </select>
+                      <span style="display:inline-block;width:100%;padding:10px;text-align:center;background:#eef2f7;border:1px solid #e3e8ef;border-radius:6px;font-weight:700;color:var(--pc-blue);">+</span>
                     </div>
                     <div class="form-group">
                       <input type="number" id="ruleAdjustValue" class="form-input" placeholder="Amount" required min="0">
@@ -106,13 +103,6 @@
                   </div>
                   <small style="color:#999;font-size:12px;">% = percentage of current price. Fixed ? = flat amount.</small>
                 </div>
-              <div class="form-group">
-                <label class="toggle-label">
-                  <input type="checkbox" id="ruleEnabled" checked>
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-text">Active</span>
-                </label>
-              </div>
             </form>
           </div>
           <div class="modal-footer">
@@ -125,6 +115,6 @@
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=10"></script>
+  <script src="js/script.js?v=11"></script>
 </body>
 </html>

@@ -458,6 +458,8 @@ button, input { outline: none; border: none; font-family: inherit; }
 .status-pill.completed { background-color: #cce5ff; color: #004085; }
 .status-pill.pending { background-color: #ffe5d0; color: #8a3b00; }
 .status-pill.low { background-color: #f8d7da; color: #842029; }
+.status-pill.warn { background-color: #fff3cd; color: #856404; }
+.status-pill.danger { background-color: #f8d7da; color: #842029; }
 
 /* =========================================
    Point of Sale (POS) Specific UI

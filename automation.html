@@ -1,9 +1,10 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Price Automation</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="css/styles.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -90,7 +91,7 @@
                     <div class="form-group" style="flex:0.4;">
                       <select id="ruleDirection" class="form-input">
                         <option value="add">+</option>
-                        <option value="subtract">−</option>
+                        <option value="subtract">-</option>
                       </select>
                     </div>
                     <div class="form-group">
@@ -99,11 +100,11 @@
                     <div class="form-group" style="flex:0.6;">
                       <select id="ruleAdjustType" class="form-input">
                         <option value="percent">%</option>
-                        <option value="none">Fixed ₱</option>
+                        <option value="none">Fixed ?</option>
                       </select>
                     </div>
                   </div>
-                  <small style="color:#999;font-size:12px;">% = percentage of current price. Fixed ₱ = flat amount.</small>
+                  <small style="color:#999;font-size:12px;">% = percentage of current price. Fixed ? = flat amount.</small>
                 </div>
               <div class="form-group">
                 <label class="toggle-label">
@@ -124,6 +125,6 @@
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=3"></script>
+  <script src="js/script.js?v=4"></script>
 </body>
 </html>

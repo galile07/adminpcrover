@@ -591,10 +591,20 @@ const filterTabs = document.querySelectorAll('.sub-nav-item');
 if (ordersContainer && filterTabs.length > 0) {
   let onlineOrders = [];
 
+  function toNum(v) { return parseFloat(String(v ?? '').replace(/[^0-9.\-]/g, '')) || 0; }
+
+  function pickName(v) {
+    if (!v) return '';
+    if (typeof v === 'string') return v.trim();
+    if (Array.isArray(v)) return v.length ? String(v[0]) : '';
+    if (typeof v === 'object') return v.name || v.full_name || v.username || '';
+    return String(v);
+  }
+
   function parseOrderItems(raw) {
     if (!raw) return [];
     if (Array.isArray(raw)) {
-      return raw.map(i => ({ name: i.name || i.item || 'Item', qty: i.qty || 1, price: i.price || 0 }));
+      return raw.map(i => ({ name: i.name || i.item || 'Item', qty: i.qty || 1, price: toNum(i.price) || toNum(i.value) || 0 }));
     }
     if (typeof raw === 'string') {
       try {
@@ -634,7 +644,7 @@ if (ordersContainer && filterTabs.length > 0) {
       const orders = (data && data.orders) || [];
       const mapped = orders.map(o => ({
         id: o.id, code: String(o.id || '').toUpperCase().slice(0, 8),
-        customer: o.customer_name || 'Customer', address: o.address || '',
+        customer: pickName(o.customer_name) || 'Customer', address: o.address || '',
         phone: o.phone || '', email: o.email || '',
         amount: o.total || 0,
         status: String(o.status || 'pending').toLowerCase(),

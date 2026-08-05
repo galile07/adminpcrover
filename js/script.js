@@ -269,29 +269,32 @@ if (recentOrdersBody) {
   const monthlySalesValueEl = document.getElementById('monthlySalesValue');
 
   (async () => {
-    let posOrders = [], completedOrders = [];
-    if (!sbClient) {
+    let posOrders = [], onlineOrdersList = [], pendingCount = 0;
+    if (!sbClient || !sbClient.functions) {
       posOrders = JSON.parse(localStorage.getItem('posOrders') || '[]');
-      completedOrders = JSON.parse(localStorage.getItem('completedOrders') || '[]');
-    } else {
-      const { data: p } = await sb('pos_orders').select('*').order('date', { ascending: false });
-      const { data: c } = await sb('online_orders').select('*').eq('status', 'Completed').order('date', { ascending: false });
-      posOrders = p || [];
-      completedOrders = (c || []).map(o => ({ id: o.id, customer: o.customer, type: 'Online', amount: o.amount, status: 'Completed', date: o.date }));
-    }
-
-    // pending count from persisted onlineOrders
-    let pendingCount = 0;
-    if (!sbClient) {
       const stored = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
+      onlineOrdersList = stored.map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date }));
       pendingCount = stored.filter(o => o.status === 'pending' || o.status === 'Pending').length;
     } else {
-      const { data: pend } = await sb('online_orders').select('*').eq('status', 'Pending');
-      pendingCount = (pend || []).length;
+      const { data: p } = await sb('pos_orders').select('*').order('date', { ascending: false });
+      posOrders = p || [];
+      try {
+        const { data, error } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
+        if (!error) {
+          onlineOrdersList = ((data && data.orders) || []).map(o => ({
+            id: String(o.id || '').toUpperCase().slice(0, 8),
+            customer: o.customer_name || o.name || 'Customer',
+            type: 'Online', amount: o.total || 0, status: o.status, date: (o.created_at || '').slice(0, 10)
+          }));
+          pendingCount = onlineOrdersList.filter(o => String(o.status).toLowerCase() === 'pending').length;
+        }
+      } catch (e) {
+        const stored = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
+        pendingCount = stored.filter(o => o.status === 'pending' || o.status === 'Pending').length;
+      }
     }
-    if (pendingCount === 0) pendingCount = 0;
 
-    const recentOrders = [...posOrders, ...completedOrders];
+    const recentOrders = [...posOrders.map(o => ({ ...o, type: o.type || 'Walk-in' })), ...onlineOrdersList];
 
     const invProducts = await fetchAll('inventory');
     const lowStockItems = invProducts.filter(p => p.enabled && p.stock <= (p.threshold || 5));

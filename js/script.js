@@ -141,6 +141,16 @@ function hashString(str) {
 function normalizeProductName(name) {
   return String(name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
+function guessCategory(name) {
+  const n = String(name || '').toLowerCase();
+  const words = n.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  const hasAny = (...ws) => ws.some(w => n.includes(w));
+  const hasWord = (...ws) => ws.some(w => words.includes(w));
+  if (hasAny('used', 'second hand', '2nd hand', 'preowned', 'pre-owned', 'refurbished')) return 'preowned';
+  if (hasAny('cctv', 'camera', 'dvr', 'nvr', 'alarm', 'doorbell', 'surveillance', 'security', 'sensor', 'ip cam')) return 'security';
+  if (hasWord('monitor', 'ssd', 'hdd', 'printer', 'desktop', 'tower', 'cpu', 'processor', 'ram', 'memory', 'laptop', 'notebook', 'motherboard', 'gpu', 'graphics', 'pc')) return 'computers';
+  return 'accessories';
+}
 function unsplashImage(seed, width) {
   const id = IMAGE_POOL[hashString(String(seed)) % IMAGE_POOL.length];
   return 'https://images.unsplash.com/photo-' + id + '?auto=format&fit=crop&w=' + width + '&q=80&ixlib=rb-4.1.0';
@@ -413,6 +423,7 @@ if (inventoryTableBody) {
       return '<tr>' +
         '<td>' + imgHtml + '</td>' +
         '<td><strong>' + p.name + '</strong>' + (p._src === 'imported' ? ' <span style="font-size:11px;color:#999;">(imported)</span>' : '') + '</td>' +
+        '<td>' + (p.category || guessCategory(p.name)) + '</td>' +
         '<td>' + fmt(p.price) + '</td>' +
         '<td>' + p.stock + '</td>' +
         '<td>' + (p.enabled ? '<span class="status-pill active">In Stock</span>' : '<span class="status-pill paused">Disabled</span>') + '</td>' +
@@ -482,10 +493,10 @@ if (inventoryTableBody) {
     const products = await fetchInv();
     if (id) {
       const p = products.find(x => x.id === parseInt(id));
-      if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.threshold = threshold; p.enabled = enabled; if (imgSrc) p.image = imgSrc; }
+      if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.threshold = threshold; p.enabled = enabled; p.category = guessCategory(name); if (imgSrc) p.image = imgSrc; }
     } else {
       const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1;
-      products.push({ id: newId, name, description, price, stock, threshold, enabled, image: imgSrc });
+      products.push({ id: newId, name, description, price, stock, threshold, enabled, image: imgSrc, category: guessCategory(name) });
     }
     await saveInv(products);
     renderInv();
@@ -540,7 +551,7 @@ if (inventoryTableBody) {
           if (existingNames.has(name.toLowerCase())) { skipped++; continue; }
           const price = parseFloat(pi >= 0 ? row[pi] : row[1]) || 0;
           const stock = parseInt(si >= 0 ? row[si] : row[2]) || 0;
-          products.push({ id: nextId++, name, price, stock, threshold: 5, enabled: true, image: '' });
+          products.push({ id: nextId++, name, price, stock, threshold: 5, enabled: true, image: '', category: guessCategory(name) });
           existingNames.add(name.toLowerCase());
           count++;
         }
@@ -578,7 +589,8 @@ if (inventoryTableBody) {
     const enabled = document.getElementById('importProductEnabled').value === 'checked';
     if (!name || isNaN(price) || isNaN(stock)) { alert('Please fill all fields.'); return; }
     const products = await fetchAll('imported_products');
-    if (id) { const p = products.find(x => x.id === parseInt(id));       if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.enabled = enabled; } }
+    if (id) { const p = products.find(x => x.id === parseInt(id));       if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.enabled = enabled; p.category = guessCategory(name); } }
+    else { const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1; products.push({ id: newId, name, description, price, stock, enabled: enabled, threshold: 5, image: '', category: guessCategory(name) }); }
     await upsertAll('imported_products', products);
     renderInv();
     closeImportProductModal();
@@ -612,7 +624,7 @@ setTimeout(async () => {
         { name: 'Stream Deck', price: 5900, stock: 5, threshold: 2, description: 'Customizable macro keypad for streamers and content creators to control scenes and apps.' }
       ];
       for (let item of d) {
-        items.push({id: items.length + 1, ...item, enabled: true, image: ''});
+        items.push({id: items.length + 1, ...item, enabled: true, image: '', category: guessCategory(item.name)});
       }
       await upsertAll('inventory', items);
       if (document.getElementById('inventoryTableBody')) renderInv();
@@ -633,7 +645,7 @@ setTimeout(async () => {
         { name: 'Noise Canceling Earbuds', price: 4600, stock: 12, description: 'True wireless earbuds with active noise canceling and 24h battery.' }
       ];
       for (let item of d) {
-        imp.push({ id: imp.length + 1, ...item, threshold: 5, enabled: true, image: '' });
+        imp.push({ id: imp.length + 1, ...item, threshold: 5, enabled: true, image: '', category: guessCategory(item.name) });
       }
       await upsertAll('imported_products', imp);
       if (document.getElementById('inventoryTableBody')) renderInv();

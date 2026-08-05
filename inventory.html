@@ -1,10 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Inventory Management</title>
   <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
@@ -30,13 +31,18 @@
         <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
       </header>
       <section class="page-content">
-        <div class="section-heading">
-          <h2>Products</h2>
-          <div style="display:flex;gap:10px;">
-            <button class="btn btn-secondary" onclick="document.getElementById('invExcelInput').click()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">📥 Import Excel</button>
-            <button class="btn btn-primary" onclick="openAddProductModal()">+ Add Product</button>
+          <div class="section-heading">
+            <h2>Products</h2>
+            <div style="display:flex;gap:10px;">
+              <button class="btn btn-secondary" onclick="document.getElementById('invExcelInput').click()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Import Excel</button>
+              <button class="btn btn-primary" onclick="openAddProductModal()">+ Add Product</button>
+            </div>
           </div>
-        </div>
+          <nav class="sub-nav">
+            <button class="sub-nav-item active" data-source="all" onclick="filterInventory('all')">All Products</button>
+            <button class="sub-nav-item" data-source="inventory" onclick="filterInventory('inventory')">Inventory</button>
+            <button class="sub-nav-item" data-source="imported" onclick="filterInventory('imported')">Imported</button>
+          </nav>
         <input type="file" id="invExcelInput" accept=".xlsx,.xls" style="display:none;" onchange="inventoryImportExcel(event)">
         <div class="card table-card">
           <table>
@@ -68,9 +74,13 @@
                 <label>Product Name</label>
                 <input type="text" id="productName" class="form-input" required>
               </div>
+              <div class="form-group">
+                <label>Description (for customer view)</label>
+                <textarea id="productDescription" class="form-input" rows="2" style="resize:vertical;"></textarea>
+              </div>
               <div class="form-row">
                 <div class="form-group">
-                  <label>Price (₱)</label>
+                  <label>Price (in Peso)</label>
                   <input type="number" id="productPrice" class="form-input" required min="0">
                 </div>
                 <div class="form-group">
@@ -83,14 +93,8 @@
                   <label>Low Stock Threshold</label>
                   <input type="number" id="productThreshold" class="form-input" required min="0">
                 </div>
-                <div class="form-group" style="justify-content:flex-end;">
-                  <label class="toggle-label">
-                    <input type="checkbox" id="productEnabled" checked>
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-text">Active</span>
-                  </label>
-                </div>
               </div>
+              <input type="hidden" id="productEnabled" value="checked">
               <div class="form-group">
                 <label>Product Image</label>
                 <input type="file" id="productImage" class="form-input" accept="image/*" onchange="previewImage(event)">
@@ -99,6 +103,7 @@
             </form>
           </div>
           <div class="modal-footer">
+            <button id="deleteProductBtn" class="btn btn-danger" onclick="deleteProduct()" style="display:none;background:#dc3545;color:#fff;border:none;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Delete</button>
             <button class="btn btn-secondary" onclick="closeProductModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
             <button class="btn btn-primary" onclick="saveProduct()">Save Product</button>
           </div>
@@ -119,9 +124,13 @@
                 <label>Product Name</label>
                 <input type="text" id="importProductName" class="form-input" required>
               </div>
+              <div class="form-group">
+                <label>Description (for customer view)</label>
+                <textarea id="importProductDescription" class="form-input" rows="2" style="resize:vertical;"></textarea>
+              </div>
               <div class="form-row">
                 <div class="form-group">
-                  <label>Price (₱)</label>
+                  <label>Price (in Peso)</label>
                   <input type="number" id="importProductPrice" class="form-input" required min="0">
                 </div>
                 <div class="form-group">
@@ -129,13 +138,7 @@
                   <input type="number" id="importProductStock" class="form-input" required min="0">
                 </div>
               </div>
-              <div class="form-group">
-                <label class="toggle-label">
-                  <input type="checkbox" id="importProductEnabled" checked>
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-text">Active</span>
-                </label>
-              </div>
+              <input type="hidden" id="importProductEnabled" value="checked">
             </form>
           </div>
           <div class="modal-footer">
@@ -148,6 +151,7 @@
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js"></script>
+  <script src="js/script.js?v=2"></script>
 </body>
 </html>
+

@@ -1,20 +1,24 @@
-// ==========================================
+﻿// ==========================================
 // SUPABASE CLIENT INIT (with fallback)
 // ==========================================
 const SUPABASE_URL = 'https://bpleimrxzigbhpofavec.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwbGVpbXJ4emlnYmhwb2ZhdmVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3Njg5NjIsImV4cCI6MjA5OTM0NDk2Mn0.bElPIF6WLAqWUD9WQLea8pMsPeO3IZr4K-1kjeim5Gw';
 
+console.log('script.js v2 loaded');
 let sbClient = null;
 try {
   if (typeof window.supabase !== 'undefined' && window.supabase && window.supabase.createClient) {
     sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('sbClient created');
+  } else {
+    console.log('window.supabase not available');
   }
-} catch (e) { console.warn('Supabase init failed, using localStorage fallback:', e); }
+} catch (e) { console.log('sbClient init error:', e); }
 
 function sb(table) { return sbClient ? sbClient.from(table) : null; }
 setTimeout(() => {
   if (!sbClient && typeof window.supabase !== 'undefined' && window.supabase && window.supabase.createClient) {
-    try { sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) {}
+    try { sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); console.log('sbClient created (retry)'); } catch (e) {}
   }
 }, 1500);
 
@@ -22,18 +26,31 @@ setTimeout(() => {
 // HELPERS: backend / localStorage
 // ==========================================
 async function fetchAll(table) {
-  if (!sbClient) return JSON.parse(localStorage.getItem(table) || '[]');
-  const { data } = await sb(table).select('*').order('id');
-  return data || [];
+  const raw = localStorage.getItem(table);
+  const local = raw ? JSON.parse(raw) : null;
+  if (local && local.length) return local;
+  if (!sbClient) return local || [];
+  try {
+    const { data, error } = await sb(table).select('*').order('id');
+    if (error) throw error;
+    if (data && data.length) { localStorage.setItem(table, JSON.stringify(data)); return data; }
+    return [];
+  } catch(e) { return local || []; }
 }
 async function upsertAll(table, rows) {
   if (!sbClient) { localStorage.setItem(table, JSON.stringify(rows)); return; }
-  if (!rows.length) { await sb(table).delete().neq('id', 0); return; }
-  await sb(table).upsert(rows, { onConflict: 'id' });
+  if (!rows.length) { try { const r = await sb(table).delete().neq('id', 0); if (r.error) throw r.error; } catch(e) {} return; }
+  try {
+    const r = await sb(table).upsert(rows, { onConflict: 'id' });
+    if (r.error) throw r.error;
+  } catch(e) {
+    localStorage.setItem(table, JSON.stringify(rows));
+  }
 }
 async function deleteAll(table) {
   if (!sbClient) { localStorage.setItem(table, '[]'); return; }
-  await sb(table).delete().neq('id', 0);
+  try { const r = await sb(table).delete().neq('id', 0); if (r.error) throw r.error; }
+  catch(e) { localStorage.setItem(table, '[]'); }
 }
 
 // ==========================================
@@ -116,13 +133,6 @@ if (cartList) {
   const searchInput = document.getElementById('posSearchInput');
   const posGrid = document.querySelector('.pos-grid');
 
-  const emojis = {
-    'Mechanical Keyboard': '⌨️', 'Gaming Mouse': '🖱️', '27" Monitor': '🖥️',
-    'Laptop Stand': '💻', 'Gaming Headset': '🎧', 'Webcam HD': '📷',
-    'Bluetooth Speaker': '🔊', 'SSD 1TB': '💾', 'USB-C Hub': '🧮',
-    'Printer': '🖨️', 'Mouse Pad': '📦', 'Extension Cord': '🔌'
-  };
-
   let _pendingTotal = 0;
 
   async function loadAndRenderPOS() {
@@ -134,7 +144,7 @@ if (cartList) {
     const all = [...invCards, ...impCards];
     posGrid.innerHTML = all.map(c =>
       '<div class="pos-item-card" data-name="' + c.name + '" data-price="' + c.price + '" data-source="' + c.source + '" data-id="' + c.dataId + '">' +
-        '<div class="pos-item-img">' + (emojis[c.name] || '📦') + '</div>' +
+        '<div class="pos-item-img"></div>' +
         '<div class="pos-item-name">' + c.name + '</div>' +
         '<div class="pos-item-price">₱' + c.price.toLocaleString() + '</div>' +
       '</div>'
@@ -279,8 +289,7 @@ if (recentOrdersBody) {
       const { data: pend } = await sb('online_orders').select('*').eq('status', 'Pending');
       pendingCount = (pend || []).length;
     }
-    // if no real data, show 2 demo pending (but only if not already accepted)
-    if (pendingCount === 0) pendingCount = 2;
+    if (pendingCount === 0) pendingCount = 0;
 
     const recentOrders = [...posOrders, ...completedOrders];
 
@@ -319,11 +328,19 @@ if (inventoryTableBody) {
   async function fetchInv() { return await fetchAll('inventory'); }
   async function saveInv(p) { await upsertAll('inventory', p); }
 
+  let _invSource = 'all';
+  window.filterInventory = (source) => {
+    _invSource = source;
+    document.querySelectorAll('.sub-nav-item').forEach(b => b.classList.toggle('active', b.dataset.source === source));
+    renderInv();
+  };
+
   async function renderInv() {
     const inv = await fetchInv();
     const imp = await fetchAll('imported_products');
     const fmt = (a) => '₱' + a.toLocaleString('en-US', { minimumFractionDigits: 2 });
-    const all = [...inv.map(p => ({ ...p, _src: 'inventory' })), ...imp.map(p => ({ ...p, _src: 'imported' }))];
+    let all = [...inv.map(p => ({ ...p, _src: 'inventory' })), ...imp.map(p => ({ ...p, _src: 'imported' }))];
+    if (_invSource !== 'all') all = all.filter(p => p._src === _invSource);
 
     inventoryTableBody.innerHTML = all.map(p => {
       let toggleHtml;
@@ -334,7 +351,7 @@ if (inventoryTableBody) {
       }
       const imgHtml = p.image
         ? '<img src="' + p.image + '" class="inv-thumb" alt="' + p.name + '">'
-        : '<div class="inv-thumb" style="background:#f5f5f5;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:16px;">📷</div>';
+        : '<div class="inv-thumb" style="background:#f5f5f5;display:flex;align-items:center;justify-content:center;"></div>';
       return '<tr>' +
         '<td>' + imgHtml + '</td>' +
         '<td><strong>' + p.name + '</strong>' + (p._src === 'imported' ? ' <span style="font-size:11px;color:#999;">(imported)</span>' : '') + '</td>' +
@@ -343,8 +360,8 @@ if (inventoryTableBody) {
         '<td>' + (p.enabled ? '<span class="status-pill active">In Stock</span>' : '<span class="status-pill paused">Disabled</span>') + '</td>' +
         '<td style="white-space:nowrap;text-align:center;">' +
           (p._src === 'imported'
-            ? '<button class="btn-icon" onclick="editImportProduct(' + p.id + ')" title="Edit">✏️</button>'
-            : '<button class="btn-icon" onclick="editProduct(' + p.id + ')" title="Edit">✏️</button>') +
+            ? '<button class="btn-icon" onclick="editImportProduct(' + p.id + ')" title="Edit">Edit</button>'
+            : '<button class="btn-icon" onclick="editProduct(' + p.id + ')" title="Edit">Edit</button>') +
           toggleHtml +
         '</td>' +
       '</tr>';
@@ -357,6 +374,17 @@ if (inventoryTableBody) {
     if (r) { r.enabled = !r.enabled; await saveInv(p); renderInv(); }
   };
 
+  window.deleteProduct = async () => {
+    const id = document.getElementById('editProductId').value;
+    if (!id) return;
+    if (!confirm('Delete this product permanently?')) return;
+    let products = await fetchInv();
+    products = products.filter(p => p.id !== parseInt(id));
+    await saveInv(products);
+    renderInv();
+    closeProductModal();
+  };
+
   window.openAddProductModal = () => {
     document.getElementById('productModalTitle').textContent = 'Add Product';
     document.getElementById('editProductId').value = '';
@@ -364,10 +392,11 @@ if (inventoryTableBody) {
     document.getElementById('productPrice').value = '';
     document.getElementById('productStock').value = '';
     document.getElementById('productThreshold').value = '5';
-    document.getElementById('productEnabled').checked = true;
+    document.getElementById('productEnabled').value = 'checked';
     document.getElementById('productImage').value = '';
     document.getElementById('imagePreview').style.display = 'none';
     document.getElementById('imagePreview').innerHTML = '';
+    document.getElementById('deleteProductBtn').style.display = 'none';
     document.getElementById('productModal').style.display = 'flex';
   };
   window.closeProductModal = () => { document.getElementById('productModal').style.display = 'none'; };
@@ -384,20 +413,21 @@ if (inventoryTableBody) {
   window.saveProduct = async () => {
     const id = document.getElementById('editProductId').value;
     const name = document.getElementById('productName').value.trim();
+    const description = document.getElementById('productDescription').value.trim();
     const price = parseFloat(document.getElementById('productPrice').value);
     const stock = parseInt(document.getElementById('productStock').value);
     const threshold = parseInt(document.getElementById('productThreshold').value);
-    const enabled = document.getElementById('productEnabled').checked;
+    const enabled = document.getElementById('productEnabled').value === 'checked';
     const preview = document.getElementById('imagePreview');
     const imgSrc = preview.querySelector('img') ? preview.querySelector('img').src : '';
     if (!name || isNaN(price) || isNaN(stock) || isNaN(threshold)) { alert('Please fill all fields.'); return; }
     const products = await fetchInv();
     if (id) {
       const p = products.find(x => x.id === parseInt(id));
-      if (p) { p.name = name; p.price = price; p.stock = stock; p.threshold = threshold; p.enabled = enabled; if (imgSrc) p.image = imgSrc; }
+      if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.threshold = threshold; p.enabled = enabled; if (imgSrc) p.image = imgSrc; }
     } else {
       const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1;
-      products.push({ id: newId, name, price, stock, threshold, enabled, image: imgSrc });
+      products.push({ id: newId, name, description, price, stock, threshold, enabled, image: imgSrc });
     }
     await saveInv(products);
     renderInv();
@@ -410,10 +440,12 @@ if (inventoryTableBody) {
     document.getElementById('productModalTitle').textContent = 'Edit Product';
     document.getElementById('editProductId').value = p.id;
     document.getElementById('productName').value = p.name;
+    document.getElementById('productDescription').value = p.description || '';
     document.getElementById('productPrice').value = p.price;
     document.getElementById('productStock').value = p.stock;
     document.getElementById('productThreshold').value = p.threshold || 5;
-    document.getElementById('productEnabled').checked = p.enabled;
+    document.getElementById('productEnabled').value = p.enabled ? 'checked' : '';
+    document.getElementById('deleteProductBtn').style.display = 'inline-block';
     const preview = document.getElementById('imagePreview');
     if (p.image) { preview.style.display = 'block'; preview.innerHTML = '<img src="' + p.image + '">'; }
     else { preview.style.display = 'none'; preview.innerHTML = ''; }
@@ -438,20 +470,26 @@ if (inventoryTableBody) {
         const ni = hr.findIndex(h => h.includes('product') || h.includes('name') || h.includes('item'));
         const pi = hr.findIndex(h => h.includes('price') || h.includes('amount') || h.includes('cost'));
         const si = hr.findIndex(h => h.includes('stock') || h.includes('qty') || h.includes('quantity'));
-        const products = await fetchInv();
+        const products = await fetchAll('imported_products');
+        const existingNames = new Set(products.map(p => p.name.toLowerCase()));
         let nextId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1;
-        let count = 0;
+        let count = 0, skipped = 0;
         for (let i = 1; i < json.length; i++) {
           const row = json[i];
           if (!row || row.length === 0) continue;
           const name = ni >= 0 ? String(row[ni] || '').trim() : (String(row[0] || '').trim());
+          if (!name) continue;
+          if (existingNames.has(name.toLowerCase())) { skipped++; continue; }
           const price = parseFloat(pi >= 0 ? row[pi] : row[1]) || 0;
           const stock = parseInt(si >= 0 ? row[si] : row[2]) || 0;
-          if (name) { products.push({ id: nextId++, name, price, stock, threshold: 5, enabled: true, image: '' }); count++; }
+          products.push({ id: nextId++, name, price, stock, threshold: 5, enabled: true, image: '' });
+          existingNames.add(name.toLowerCase());
+          count++;
         }
-        await saveInv(products);
+        await upsertAll('imported_products', products);
         renderInv();
-        alert('Imported ' + count + ' products.');
+        const msg = 'Imported ' + count + ' product' + (count !== 1 ? 's' : '') + '.';
+        alert(skipped ? msg + ' (' + skipped + ' duplicate' + (skipped > 1 ? 's' : '') + ' skipped)' : msg);
       } catch (err) { alert('Error reading file: ' + err.message); }
     };
     reader.readAsArrayBuffer(file);
@@ -466,21 +504,23 @@ if (inventoryTableBody) {
     document.getElementById('importProductModalTitle').textContent = 'Edit Imported Product';
     document.getElementById('editImportProductId').value = p.id;
     document.getElementById('importProductName').value = p.name;
+    document.getElementById('importProductDescription').value = p.description || '';
     document.getElementById('importProductPrice').value = p.price;
     document.getElementById('importProductStock').value = p.stock;
-    document.getElementById('importProductEnabled').checked = p.enabled;
+    document.getElementById('importProductEnabled').value = p.enabled ? 'checked' : '';
     document.getElementById('importProductModal').style.display = 'flex';
   };
   window.closeImportProductModal = () => { document.getElementById('importProductModal').style.display = 'none'; };
   window.saveImportProduct = async () => {
     const id = document.getElementById('editImportProductId').value;
     const name = document.getElementById('importProductName').value.trim();
+    const description = document.getElementById('importProductDescription').value.trim();
     const price = parseFloat(document.getElementById('importProductPrice').value);
     const stock = parseInt(document.getElementById('importProductStock').value);
-    const enabled = document.getElementById('importProductEnabled').checked;
+    const enabled = document.getElementById('importProductEnabled').value === 'checked';
     if (!name || isNaN(price) || isNaN(stock)) { alert('Please fill all fields.'); return; }
     const products = await fetchAll('imported_products');
-    if (id) { const p = products.find(x => x.id === parseInt(id)); if (p) { p.name = name; p.price = price; p.stock = stock; p.enabled = enabled; } }
+    if (id) { const p = products.find(x => x.id === parseInt(id));       if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.enabled = enabled; } }
     await upsertAll('imported_products', products);
     renderInv();
     closeImportProductModal();
@@ -494,6 +534,54 @@ if (inventoryTableBody) {
   renderInv();
 }
 
+// Auto-seed inventory if empty
+setTimeout(async () => {
+  try {
+    let items = await fetchAll('inventory');
+    if (items && items.length === 0) {
+      const d = [
+        { name: 'Wireless Mouse', price: 750, stock: 18, threshold: 6, description: 'Reliable wireless mouse with ergonomic design, perfect for daily office use.' },
+        { name: 'Gaming Chair', price: 12500, stock: 4, threshold: 2, description: 'High-back ergonomic gaming chair with lumbar support and adjustable armrests.' },
+        { name: 'Monitor Arm', price: 2200, stock: 9, threshold: 4, description: 'Adjustable gas-spring monitor arm for a cleaner, more ergonomic desk setup.' },
+        { name: 'RGB Strip', price: 550, stock: 40, threshold: 10, description: 'Colorful RGB LED strip with remote control, ideal for gaming ambiance.' },
+        { name: 'External HDD 2TB', price: 2800, stock: 11, threshold: 4, description: 'Portable 2TB external hard drive for backups and extra storage on the go.' },
+        { name: 'Mechanical Numpad', price: 950, stock: 14, threshold: 5, description: 'Compact mechanical numeric keypad with blue switches for fast data entry.' },
+        { name: 'USB Microphone', price: 3200, stock: 7, threshold: 3, description: 'Plug-and-play condenser microphone with crystal-clear audio for streaming.' },
+        { name: 'LED Desk Lamp', price: 1100, stock: 16, threshold: 5, description: 'Touch-controlled LED desk lamp with adjustable brightness and color temperature.' },
+        { name: 'Cable Mgmt Kit', price: 350, stock: 35, threshold: 10, description: 'Complete cable management kit with clips, sleeves, and ties for a tidy workspace.' },
+        { name: 'Cooling Pad', price: 1500, stock: 10, threshold: 4, description: 'Laptop cooling pad with dual silent fans to prevent overheating during long sessions.' },
+        { name: 'Wireless Charger', price: 680, stock: 22, threshold: 8, description: 'Fast wireless charging pad compatible with all Qi-enabled devices.' },
+        { name: 'Stream Deck', price: 5900, stock: 5, threshold: 2, description: 'Customizable macro keypad for streamers and content creators to control scenes and apps.' }
+      ];
+      for (let item of d) {
+        items.push({id: items.length + 1, ...item, enabled: true, image: ''});
+      }
+      await upsertAll('inventory', items);
+      if (document.getElementById('inventoryTableBody')) renderInv();
+      if (document.querySelector('.pos-grid')) loadAndRenderPOS();
+    }
+  } catch (e) { console.warn('Seed failed:', e); }
+}, 500);
+
+// Auto-seed imported products if empty
+setTimeout(async () => {
+  try {
+    let imp = await fetchAll('imported_products');
+    if (imp && imp.length === 0) {
+      const d = [
+        { name: 'Ergonomic Keyboard', price: 3200, stock: 8, description: 'Split ergonomic keyboard with mechanical switches for comfortable typing.' },
+        { name: 'Portable Monitor 15.6"', price: 7200, stock: 5, description: 'USB-C portable monitor perfect for dual-screen setups on the go.' },
+        { name: 'Desk Mount Dual Arm', price: 3800, stock: 6, description: 'Heavy-duty dual monitor desk mount with gas spring adjustment.' },
+        { name: 'Noise Canceling Earbuds', price: 4600, stock: 12, description: 'True wireless earbuds with active noise canceling and 24h battery.' }
+      ];
+      for (let item of d) {
+        imp.push({ id: imp.length + 1, ...item, threshold: 5, enabled: true, image: '' });
+      }
+      await upsertAll('imported_products', imp);
+      if (document.getElementById('inventoryTableBody')) renderInv();
+    }
+  } catch (e) { console.warn('Imported seed failed:', e); }
+}, 600);
 // ==========================================
 // 5. ONLINE ORDERS
 // ==========================================
@@ -503,50 +591,65 @@ const filterTabs = document.querySelectorAll('.sub-nav-item');
 if (ordersContainer && filterTabs.length > 0) {
   let onlineOrders = [];
 
-  function persistOnlineOrders() {
-    if (!sbClient) {
-      localStorage.setItem('onlineOrders', JSON.stringify(onlineOrders));
-    } else {
-      // upsert all online orders back to supabase
-      onlineOrders.forEach(o => {
-        const statusMap = { pending: 'Pending', shipped: 'Shipped', delivered: 'Delivered' };
-        sb('online_orders').upsert({
-          id: o.id, customer: o.customer, amount: o.amount,
-          status: statusMap[o.status] || o.status,
-          date: o.date, items: o.items.map(i => i.name).join(', '),
-          address: o.address, contact: o.phone
-        }, { onConflict: 'id' });
-      });
+  function parseOrderItems(raw) {
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+      return raw.map(i => ({ name: i.name || i.item || 'Item', qty: i.qty || 1, price: i.price || 0 }));
     }
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parseOrderItems(parsed);
+      } catch (e) {}
+      return raw.split(',').filter(Boolean).map(i => ({ name: i.trim(), qty: 1, price: 0 }));
+    }
+    return [];
+  }
+
+  function persistOnlineOrders() {
+    localStorage.setItem('onlineOrders', JSON.stringify(onlineOrders));
+  }
+
+  async function callOrdersFn(action, order_id) {
+    if (!sbClient || !sbClient.functions) return false;
+    try {
+      const { error } = await sbClient.functions.invoke('admin-orders', {
+        method: action ? 'POST' : 'GET',
+        body: action ? { action, order_id } : undefined
+      });
+      if (error) throw error;
+      return true;
+    } catch (e) { console.warn('admin-orders call failed:', e); return false; }
+  }
+
+  async function fetchOnlineOrders() {
+    const raw = localStorage.getItem('onlineOrders');
+    const local = raw ? JSON.parse(raw) : [];
+    if (!sbClient || !sbClient.functions) return local;
+    try {
+      console.log('Fetching orders from edge function...');
+      const { data, error } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
+      if (error) throw error;
+      console.log('Orders fetched:', data);
+      const orders = (data && data.orders) || [];
+      const mapped = orders.map(o => ({
+        id: o.id, customer: o.customer_name || 'Customer', address: o.address || '',
+        phone: o.phone || '', email: o.email || '',
+        amount: o.total || 0,
+        status: String(o.status || 'pending').toLowerCase(),
+        date: (o.created_at || getTodayStr()).slice(0, 10), time: '12:00 PM',
+        items: parseOrderItems(o.items)
+      }));
+      if (mapped.length) localStorage.setItem('onlineOrders', JSON.stringify(mapped));
+      else localStorage.removeItem('onlineOrders');
+      return mapped;
+    } catch (e) { return local; }
   }
 
   (async () => {
-    if (!sbClient) {
-      onlineOrders = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
-    } else {
-      const { data } = await sb('online_orders').select('*').order('date', { ascending: false });
-      onlineOrders = (data || []).map(o => ({
-        id: o.id, customer: o.customer, address: o.address || '',
-        phone: o.contact || '', email: '',
-        amount: o.amount, status: o.status === 'Completed' ? 'delivered' : o.status.toLowerCase(),
-        date: o.date, time: '12:00 PM',
-        items: (o.items || '').split(',').filter(Boolean).map(i => ({ name: i.trim(), qty: 1, price: 0 }))
-      }));
-    }
-    if (!onlineOrders.length) onlineOrders = getDefaultOrders();
-    persistOnlineOrders();
+    onlineOrders = await fetchOnlineOrders();
     renderOrders('pending');
   })();
-
-  function getDefaultOrders() {
-    return [
-      { id: '#2001', customer: 'Arielle M.', address: '123 Rizal St, Baliuag, Bulacan', phone: '0917-123-4567', email: 'arielle.m@email.com', amount: 5420, status: 'pending', date: '2026-07-06', time: '08:30 AM', items: [{ name: 'Mechanical Keyboard', qty: 1, price: 2350 }, { name: 'Gaming Mouse', qty: 2, price: 1535 }] },
-      { id: '#2002', customer: 'Nina R.', address: '456 Mabini Ave, Malolos, Bulacan', phone: '0928-234-5678', email: 'nina.r@email.com', amount: 1850, status: 'pending', date: '2026-07-06', time: '09:15 AM', items: [{ name: 'USB-C Hub', qty: 1, price: 850 }, { name: 'Mouse Pad', qty: 2, price: 500 }] },
-      { id: '#2003', customer: 'Ben T.', address: '789 Del Pilar St, Baliuag, Bulacan', phone: '0939-345-6789', email: 'ben.t@email.com', amount: 2480, status: 'shipped', date: '2026-07-05', time: '10:00 AM', items: [{ name: 'Webcam HD', qty: 1, price: 1800 }, { name: 'Microphone', qty: 1, price: 680 }] },
-      { id: '#2004', customer: 'Rina C.', address: '321 Luna St, Plaridel, Bulacan', phone: '0940-456-7890', email: 'rina.c@email.com', amount: 3210, status: 'shipped', date: '2026-07-04', time: '02:30 PM', items: [{ name: '27" Monitor', qty: 1, price: 3210 }] },
-      { id: '#2005', customer: 'Mark D.', address: '654 Bonifacio St, Baliuag, Bulacan', phone: '0951-567-8901', email: 'mark.d@email.com', amount: 1320, status: 'delivered', date: '2026-07-03', time: '11:00 AM', items: [{ name: 'Wireless Mouse', qty: 1, price: 750 }, { name: 'Headset Stand', qty: 1, price: 570 }] }
-    ];
-  }
 
   function renderOrders(filterStatus) {
     const filtered = onlineOrders.filter(o => o.status === filterStatus).sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
@@ -566,33 +669,37 @@ if (ordersContainer && filterTabs.length > 0) {
   };
 
   window.closeOrderModal = () => { document.getElementById('orderModal').style.display = 'none'; };
-  window.acceptOrder = (id) => {
+  window.acceptOrder = async (id) => {
+    await callOrdersFn('accept', id);
     const o = onlineOrders.find(x => x.id === id);
-    if (o) { o.status = 'shipped'; persistOnlineOrders(); renderOrders(document.querySelector('.sub-nav-item.active').dataset.status); }
+    if (o) { o.status = 'shipped'; persistOnlineOrders(); }
+    renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
   };
-  window.declineOrder = (id) => {
+  window.declineOrder = async (id) => {
+    await callOrdersFn('decline', id);
     const idx = onlineOrders.findIndex(o => o.id === id);
-    if (idx !== -1) { onlineOrders.splice(idx, 1); persistOnlineOrders(); renderOrders(document.querySelector('.sub-nav-item.active').dataset.status); }
+    if (idx !== -1) { onlineOrders.splice(idx, 1); persistOnlineOrders(); }
+    renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
   };
-  window.deliverOrder = (id) => {
+  window.deliverOrder = async (id) => {
+    await callOrdersFn('deliver', id);
     const o = onlineOrders.find(x => x.id === id);
-    if (o) { o.status = 'delivered'; persistOnlineOrders(); renderOrders(document.querySelector('.sub-nav-item.active').dataset.status); }
+    if (o) { o.status = 'delivered'; persistOnlineOrders(); }
+    renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
   };
-  window.finishOrder = (id) => {
+  window.finishOrder = async (id) => {
+    await callOrdersFn('finish', id);
     const idx = onlineOrders.findIndex(o => o.id === id);
-    if (idx === -1) return;
-    const order = onlineOrders[idx];
-    onlineOrders.splice(idx, 1);
-    persistOnlineOrders();
-    if (!sbClient) {
+    if (idx !== -1) {
+      const order = onlineOrders[idx];
       const c = JSON.parse(localStorage.getItem('completedOrders') || '[]');
       c.unshift({ id: order.id, customer: order.customer, type: 'Online', amount: order.amount, status: 'Completed', date: getTodayStr() });
       localStorage.setItem('completedOrders', JSON.stringify(c));
-    } else {
-      sb('online_orders').upsert({ id: order.id, customer: order.customer, amount: order.amount, status: 'Completed', date: getTodayStr() }, { onConflict: 'id' });
+      onlineOrders.splice(idx, 1);
+      persistOnlineOrders();
     }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
@@ -620,7 +727,7 @@ if (rulesTableBody) {
     renderRules();
   })();
 
-  function ruleSign(r) { return r.direction === 'subtract' ? '−' : '+'; }
+  function ruleSign(r) { return r.direction === 'subtract' ? 'âˆ’' : '+'; }
 
   function renderRules() {
     const rules = _rulesCache || [];
@@ -628,7 +735,7 @@ if (rulesTableBody) {
       const s = r.enabled ? '<span class="status-pill active">Live</span>' : '<span class="status-pill paused">Disabled</span>';
       const sign = ruleSign(r);
       const adj = r.adjustType === 'percent' ? sign + ' ' + r.adjustValue + '%' : sign + ' ₱' + r.adjustValue;
-      return '<tr><td>' + (i + 1) + '</td><td><strong>Rule #' + (i + 1) + '</strong></td><td>' + fieldLabels[r.field] + ' ' + opLabels[r.operator] + ' ' + r.value + '</td><td>' + adj + '</td><td>' + s + '</td><td style="text-align:center;white-space:nowrap;"><button class="btn-icon" onclick="editRule(' + r.id + ')" title="Edit">✏️</button><button class="btn-icon" onclick="toggleRule(' + r.id + ')" title="Toggle">' + (r.enabled ? '⏸️' : '▶️') + '</button><button class="btn-icon danger" onclick="deleteRule(' + r.id + ')" title="Delete">🗑️</button></td></tr>';
+      return '<tr><td>' + (i + 1) + '</td><td><strong>Rule #' + (i + 1) + '</strong></td><td>' + fieldLabels[r.field] + ' ' + opLabels[r.operator] + ' ' + r.value + '</td><td>' + adj + '</td><td>' + s + '</td><td style="text-align:center;white-space:nowrap;"><button class="btn-icon" onclick="editRule(' + r.id + ')" title="Edit">Edit</button><button class="btn-icon" onclick="toggleRule(' + r.id + ')" title="Toggle">' + (r.enabled ? 'Active' : 'On') + '</button><button class="btn-icon danger" onclick="deleteRule(' + r.id + ')" title="Delete">X</button></td></tr>';
     }).join('');
   }
 
@@ -687,3 +794,11 @@ if (rulesTableBody) {
     saveRules(rules); await syncRulesToBackend(); renderRules();
   };
 }
+
+
+
+
+
+
+
+

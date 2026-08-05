@@ -273,7 +273,7 @@ if (recentOrdersBody) {
     if (!sbClient || !sbClient.functions) {
       posOrders = JSON.parse(localStorage.getItem('posOrders') || '[]');
       const stored = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
-      onlineOrdersList = stored.map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date }));
+      onlineOrdersList = stored.filter(o => String(o.status).toLowerCase() !== 'pending').map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date }));
       pendingCount = stored.filter(o => o.status === 'pending' || o.status === 'Pending').length;
     } else {
       const { data: p } = await sb('pos_orders').select('*').order('date', { ascending: false });
@@ -281,16 +281,18 @@ if (recentOrdersBody) {
       try {
         const { data, error } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
         if (!error) {
-          onlineOrdersList = ((data && data.orders) || []).map(o => ({
+          const all = ((data && data.orders) || []).map(o => ({
             id: String(o.id || '').toUpperCase().slice(0, 8),
             customer: o.customer_name || o.name || 'Customer',
             type: 'Online', amount: o.total || 0, status: o.status, date: (o.created_at || '').slice(0, 10)
           }));
-          pendingCount = onlineOrdersList.filter(o => String(o.status).toLowerCase() === 'pending').length;
+          pendingCount = all.filter(o => String(o.status).toLowerCase() === 'pending').length;
+          onlineOrdersList = all.filter(o => String(o.status).toLowerCase() !== 'pending');
         }
       } catch (e) {
         const stored = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
         pendingCount = stored.filter(o => o.status === 'pending' || o.status === 'Pending').length;
+        onlineOrdersList = stored.filter(o => String(o.status).toLowerCase() !== 'pending').map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date }));
       }
     }
 

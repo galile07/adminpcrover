@@ -310,8 +310,8 @@ if (recentOrdersBody) {
     const monthlySales = monthOrders.reduce((s, o) => s + o.amount, 0);
 
     recentOrdersBody.innerHTML = recentOrders.length
-      ? recentOrders.slice(0, 20).map(o => '<tr><td>' + o.date + '</td><td>' + o.id + '</td><td>' + fmtCurrency(o.amount) + '</td></tr>').join('')
-      : '<tr><td colspan="3" style="text-align:center;color:#999;">No orders yet</td></tr>';
+      ? recentOrders.slice(0, 20).map(o => '<tr><td>' + o.date + '</td><td>#' + (o.id || '') + '</td><td>' + (o.customer || '-') + '</td><td>' + (o.type || '') + ' · ' + (o.status || '') + '</td><td>' + fmtCurrency(o.amount) + '</td></tr>').join('')
+      : '<tr><td colspan="5" style="text-align:center;color:#999;">No orders yet</td></tr>';
 
     recentOrdersCountEl.innerText = recentOrders.length;
     ordersToAcceptCountEl.innerText = pendingCount;

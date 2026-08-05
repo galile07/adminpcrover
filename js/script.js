@@ -102,6 +102,61 @@ function getMonthStart() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
 }
 
+// Product images (same logic as customer site: real image or Unsplash fallback)
+const IMAGE_POOL = [
+  '1517336714731-489689fd1ca8',
+  '1587829741301-dc798b83add3',
+  '1527814050087-3793815479db',
+  '1505740420928-5e560c06d30e',
+  '1527443224154-c4a3942d3acf',
+  '1516035069371-29a1b244cc32',
+  '1608043152269-423dbba4e7e1',
+  '1622233744431-84c86c7f60f4',
+  '1618384887929-16ec33fab9ef',
+  '1585060544812-6b45742d762f',
+  '1593640408182-31c70c8268f5',
+  '1587202372775-e229f172b9d7',
+];
+const PRODUCT_IMAGE_IDS = {
+  'mechanical keyboard': '1756388371735-cc845c578200',
+  'gaming mouse': '1616296425622-4560a2ad83de',
+  '27 monitor': '1674621702671-5b92364391f2',
+  'laptop stand': '1652198144911-4f204ccf35e6',
+  'gaming headset': '1566055972289-c52022ae23b7',
+  'webcam hd': '1642083139428-9ee5fa423c46',
+  'bluetooth speaker': '1511499271651-073325718d90',
+  'ssd 1tb': '1757083840018-cd665233a112',
+  'usb c hub': '1760376789478-c1023d2dc007',
+  printer: '1612815154858-60aa4c59eaa6',
+  'mouse pad': '1569050806800-0d6be7035923',
+  'extension cord': '1565049981953-379c9c2a5d48',
+};
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+function normalizeProductName(name) {
+  return String(name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function unsplashImage(seed, width) {
+  const id = IMAGE_POOL[hashString(String(seed)) % IMAGE_POOL.length];
+  return 'https://images.unsplash.com/photo-' + id + '?auto=format&fit=crop&w=' + width + '&q=80&ixlib=rb-4.1.0';
+}
+function productImage(product, width) {
+  if (product.image) return product.image;
+  const normalized = normalizeProductName(product.name);
+  const keys = Object.keys(PRODUCT_IMAGE_IDS).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
+    if (normalized.includes(key)) {
+      return 'https://images.unsplash.com/photo-' + PRODUCT_IMAGE_IDS[key] + '?auto=format&fit=crop&w=' + width + '&q=80&ixlib=rb-4.1.0';
+    }
+  }
+  return unsplashImage(product.name, width);
+}
+
 // ==========================================
 // 1. LOGIN
 // ==========================================
@@ -139,12 +194,12 @@ if (cartList) {
     await getRules();
     const inv = await fetchAll('inventory');
     const imp = await fetchAll('imported_products');
-    const invCards = inv.filter(p => p.enabled).map(p => ({ name: p.name, price: p.price, source: 'inventory', dataId: p.id }));
-    const impCards = imp.filter(p => p.enabled).map(p => ({ name: p.name, price: applyRulesToProduct(p), source: 'imported', dataId: p.id }));
+    const invCards = inv.filter(p => p.enabled).map(p => ({ name: p.name, price: p.price, image: productImage(p, 400), source: 'inventory', dataId: p.id }));
+    const impCards = imp.filter(p => p.enabled).map(p => ({ name: p.name, price: applyRulesToProduct(p), image: productImage(p, 400), source: 'imported', dataId: p.id }));
     const all = [...invCards, ...impCards];
     posGrid.innerHTML = all.map(c =>
       '<div class="pos-item-card" data-name="' + c.name + '" data-price="' + c.price + '" data-source="' + c.source + '" data-id="' + c.dataId + '">' +
-        '<div class="pos-item-img"></div>' +
+        '<div class="pos-item-img"><img src="' + c.image + '" alt="' + c.name + '" loading="lazy"></div>' +
         '<div class="pos-item-name">' + c.name + '</div>' +
         '<div class="pos-item-price">₱' + c.price.toLocaleString() + '</div>' +
       '</div>'
@@ -354,9 +409,7 @@ if (inventoryTableBody) {
       } else {
         toggleHtml = '<button class="btn-toggle ' + (p.enabled ? 'active' : 'inactive') + '" onclick="toggleProduct(' + p.id + ')">' + (p.enabled ? 'Active' : 'Disabled') + '</button>';
       }
-      const imgHtml = p.image
-        ? '<img src="' + p.image + '" class="inv-thumb" alt="' + p.name + '">'
-        : '<div class="inv-thumb" style="background:#f5f5f5;display:flex;align-items:center;justify-content:center;"></div>';
+      const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="' + p.name + '" loading="lazy">';
       return '<tr>' +
         '<td>' + imgHtml + '</td>' +
         '<td><strong>' + p.name + '</strong>' + (p._src === 'imported' ? ' <span style="font-size:11px;color:#999;">(imported)</span>' : '') + '</td>' +

@@ -22,13 +22,24 @@ Deno.serve(async (req) => {
   );
 
   if (req.method === "GET") {
-    const { data, error } = await supabase
+    const { data: orders, error } = await supabase
       .from("orders")
       .select("*")
       .not("status", "eq", "completed")
       .order("created_at", { ascending: false });
     if (error) return json({ error: error.message }, 500, corsHeaders);
-    return json({ orders: data ?? [] }, 200, corsHeaders);
+
+    const { data: profiles, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,name");
+    if (profileError) return json({ error: profileError.message }, 500, corsHeaders);
+
+    const nameById = new Map<string, string>((profiles ?? []).map((p) => [p.id, p.name]));
+    const enriched = (orders ?? []).map((o) => ({
+      ...o,
+      customer_name: o.customer_name || nameById.get(o.user_id) || null,
+    }));
+    return json({ orders: enriched }, 200, corsHeaders);
   }
 
   if (req.method === "POST") {

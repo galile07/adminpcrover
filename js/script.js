@@ -102,6 +102,12 @@ function applyRulesToProduct(product) {
   });
   return price;
 }
+function isRuleAdjusted(product) {
+  return Math.abs(applyRulesToProduct(product) - (Number(product.price) || 0)) > 0.001;
+}
+function ruleAdjustedPrice(product) {
+  return applyRulesToProduct(product);
+}
 
 // ==========================================
 // HELPERS: currency / date
@@ -216,14 +222,14 @@ if (cartList) {
     await getRules();
     const inv = await fetchAll('inventory');
     const imp = await fetchAll('imported_products');
-    const invCards = inv.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), image: productImage(p, 400), source: 'inventory', dataId: p.id }));
-    const impCards = imp.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), image: productImage(p, 400), source: 'imported', dataId: p.id }));
+    const invCards = inv.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), adjusted: isRuleAdjusted(p), image: productImage(p, 400), source: 'inventory', dataId: p.id }));
+    const impCards = imp.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), adjusted: isRuleAdjusted(p), image: productImage(p, 400), source: 'imported', dataId: p.id }));
     const all = [...invCards, ...impCards];
     posGrid.innerHTML = all.map(c =>
       '<div class="pos-item-card" data-name="' + c.name + '" data-price="' + c.price + '" data-source="' + c.source + '" data-id="' + c.dataId + '">' +
         '<div class="pos-item-img"><img src="' + c.image + '" alt="' + c.name + '" loading="lazy"></div>' +
         '<div class="pos-item-name">' + c.name + '</div>' +
-        '<div class="pos-item-price">₱' + c.price.toLocaleString() + '</div>' +
+        '<div class="pos-item-price' + (c.adjusted ? ' rule' : '') + '" title="' + (c.adjusted ? 'Price automation active' : '') + '">₱' + c.price.toLocaleString() + '</div>' +
       '</div>'
     ).join('');
     if (searchInput && searchInput.value.trim()) filterPOS();
@@ -457,7 +463,7 @@ if (inventoryTableBody) {
         '<td>' + imgHtml + '</td>' +
         '<td><strong>' + p.name + '</strong>' + (p._src === 'imported' ? ' <span style="font-size:11px;color:#999;">(imported)</span>' : '') + '</td>' +
         '<td>' + (p.category || guessCategory(p.name)) + '</td>' +
-        '<td>' + fmt(applyRulesToProduct(p)) + '</td>' +
+        '<td>' + (isRuleAdjusted(p) ? '<span class="price-rule" title="Price automation is active for this product">' + fmt(ruleAdjustedPrice(p)) + '</span><div class="price-base">' + fmt(p.price) + '</div>' : fmt(p.price)) + '</td>' +
         '<td>' + p.stock + '</td>' +
         '<td>' + invStatusPill(p) + '</td>' +
         '<td style="white-space:nowrap;text-align:center;">' +

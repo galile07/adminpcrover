@@ -461,6 +461,9 @@ button, input { outline: none; border: none; font-family: inherit; }
 .status-pill.warn { background-color: #fff3cd; color: #856404; }
 .status-pill.danger { background-color: #f8d7da; color: #842029; }
 
+.price-rule { color: #f26f21; font-weight: 700; }
+.price-base { font-size: 11px; color: #999; text-decoration: line-through; margin-top: 2px; }
+
 /* =========================================
    Point of Sale (POS) Specific UI
    ========================================= */
@@ -586,6 +589,22 @@ button, input { outline: none; border: none; font-family: inherit; }
   font-size: 14px;
   color: var(--pc-orange);
   font-weight: 700;
+}
+
+.pos-item-price.rule {
+  color: #c2410c;
+}
+
+.pos-item-price.rule::after {
+  content: 'auto';
+  font-size: 10px;
+  font-weight: 600;
+  color: #c2410c;
+  background: rgba(242, 111, 33, 0.15);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 5px;
+  vertical-align: middle;
 }
 
 .pos-cart-section {

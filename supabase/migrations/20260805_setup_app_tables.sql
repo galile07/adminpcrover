@@ -8,7 +8,8 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT '';
 ALTER TABLE imported_products ADD COLUMN IF NOT EXISTS category TEXT DEFAULT '';
 
 -- 2. Tables with the exact columns the app uses
-CREATE TABLE IF NOT EXISTS pos_orders (
+DROP TABLE IF EXISTS pos_orders;
+CREATE TABLE pos_orders (
   id BIGSERIAL PRIMARY KEY,
   customer TEXT DEFAULT 'Walk-in Customer',
   type TEXT DEFAULT 'Walk-in',
@@ -17,7 +18,8 @@ CREATE TABLE IF NOT EXISTS pos_orders (
   date TEXT DEFAULT ''
 );
 
-CREATE TABLE IF NOT EXISTS auto_rules (
+DROP TABLE IF EXISTS auto_rules;
+CREATE TABLE auto_rules (
   id BIGSERIAL PRIMARY KEY,
   name TEXT DEFAULT '',
   direction TEXT DEFAULT 'add',

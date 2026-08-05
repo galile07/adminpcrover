@@ -64,7 +64,7 @@ async function getRules() {
   if (!sbClient) return _rulesCache || [];
   try {
     const { data } = await sb('auto_rules').select('*').order('id');
-    _rulesCache = data || [];
+    _rulesCache = (data || []).map(r => ({ ...r, adjustValue: r.adjustvalue, adjustType: r.adjusttype }));
     if (_rulesCache.length) localStorage.setItem('autoRules', JSON.stringify(_rulesCache));
     return _rulesCache;
   } catch(e) { return _rulesCache || []; }
@@ -79,7 +79,11 @@ async function syncRulesToBackend() {
     const r = await getRules();
     const d = await sb('auto_rules').delete().neq('id', 0);
     if (d.error) throw d.error;
-    if (r.length) { const i = await sb('auto_rules').insert(r); if (i.error) throw i.error; }
+    if (r.length) {
+      const mapped = r.map(x => ({ id: x.id, name: x.name || '', direction: x.direction, field: x.field, operator: x.operator, value: x.value, adjustvalue: x.adjustValue, adjusttype: x.adjustType, enabled: x.enabled !== false }));
+      const i = await sb('auto_rules').insert(mapped);
+      if (i.error) throw i.error;
+    }
   } catch(e) { console.warn('rule sync failed:', e); }
 }
 function applyRulesToProduct(product) {
@@ -212,7 +216,7 @@ if (cartList) {
     await getRules();
     const inv = await fetchAll('inventory');
     const imp = await fetchAll('imported_products');
-    const invCards = inv.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: p.price, image: productImage(p, 400), source: 'inventory', dataId: p.id }));
+    const invCards = inv.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), image: productImage(p, 400), source: 'inventory', dataId: p.id }));
     const impCards = imp.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), image: productImage(p, 400), source: 'imported', dataId: p.id }));
     const all = [...invCards, ...impCards];
     posGrid.innerHTML = all.map(c =>
@@ -434,6 +438,7 @@ if (inventoryTableBody) {
   }
 
   async function renderInv() {
+    await getRules();
     const inv = await fetchInv();
     const imp = await fetchAll('imported_products');
     const fmt = (a) => '₱' + a.toLocaleString('en-US', { minimumFractionDigits: 2 });
@@ -452,7 +457,7 @@ if (inventoryTableBody) {
         '<td>' + imgHtml + '</td>' +
         '<td><strong>' + p.name + '</strong>' + (p._src === 'imported' ? ' <span style="font-size:11px;color:#999;">(imported)</span>' : '') + '</td>' +
         '<td>' + (p.category || guessCategory(p.name)) + '</td>' +
-        '<td>' + fmt(p.price) + '</td>' +
+        '<td>' + fmt(applyRulesToProduct(p)) + '</td>' +
         '<td>' + p.stock + '</td>' +
         '<td>' + invStatusPill(p) + '</td>' +
         '<td style="white-space:nowrap;text-align:center;">' +
@@ -847,6 +852,7 @@ if (rulesTableBody) {
 
   (async () => {
     await getRules();
+    syncRulesToBackend();
     renderRules();
   })();
 

@@ -38,14 +38,13 @@ async function fetchAll(table) {
   } catch(e) { return local || []; }
 }
 async function upsertAll(table, rows) {
-  if (!sbClient) { localStorage.setItem(table, JSON.stringify(rows)); return; }
+  localStorage.setItem(table, JSON.stringify(rows));
+  if (!sbClient) return;
   if (!rows.length) { try { const r = await sb(table).delete().neq('id', 0); if (r.error) throw r.error; } catch(e) {} return; }
   try {
     const r = await sb(table).upsert(rows, { onConflict: 'id' });
     if (r.error) throw r.error;
-  } catch(e) {
-    localStorage.setItem(table, JSON.stringify(rows));
-  }
+  } catch(e) {}
 }
 async function deleteAll(table) {
   if (!sbClient) { localStorage.setItem(table, '[]'); return; }
@@ -59,10 +58,16 @@ async function deleteAll(table) {
 let _rulesCache = null;
 async function getRules() {
   if (_rulesCache) return _rulesCache;
-  if (!sbClient) return JSON.parse(localStorage.getItem('autoRules') || '[]');
-  const { data } = await sb('auto_rules').select('*').order('id');
-  _rulesCache = data || [];
-  return _rulesCache;
+  const raw = localStorage.getItem('autoRules');
+  const local = raw ? JSON.parse(raw) : null;
+  if (local && local.length) { _rulesCache = local; return local; }
+  if (!sbClient) return _rulesCache || [];
+  try {
+    const { data } = await sb('auto_rules').select('*').order('id');
+    _rulesCache = data || [];
+    if (_rulesCache.length) localStorage.setItem('autoRules', JSON.stringify(_rulesCache));
+    return _rulesCache;
+  } catch(e) { return _rulesCache || []; }
 }
 function saveRules(r) {
   _rulesCache = r;
@@ -70,9 +75,12 @@ function saveRules(r) {
 }
 async function syncRulesToBackend() {
   if (!sbClient) return;
-  const r = await getRules();
-  await sb('auto_rules').delete().neq('id', 0);
-  if (r.length) await sb('auto_rules').insert(r);
+  try {
+    const r = await getRules();
+    const d = await sb('auto_rules').delete().neq('id', 0);
+    if (d.error) throw d.error;
+    if (r.length) { const i = await sb('auto_rules').insert(r); if (i.error) throw i.error; }
+  } catch(e) { console.warn('rule sync failed:', e); }
 }
 function applyRulesToProduct(product) {
   const rules = (_rulesCache || []).filter(r => r.enabled);
@@ -301,11 +309,18 @@ if (cartList) {
         amount: total, status: 'Completed',
         date: getTodayStr()
       };
-      if (!sbClient) {
-        const s = JSON.parse(localStorage.getItem('posOrders') || '[]');
-        s.unshift(order); localStorage.setItem('posOrders', JSON.stringify(s));
-      } else {
-        await sb('pos_orders').insert(order);
+      const s = JSON.parse(localStorage.getItem('posOrders') || '[]');
+      s.unshift(order); localStorage.setItem('posOrders', JSON.stringify(s));
+      if (sbClient) {
+        try {
+          const { data: inserted, error } = await sb('pos_orders').insert({ customer: order.customer, type: order.type, amount: order.amount, status: order.status, date: order.date }).select();
+          if (error) throw error;
+          if (inserted && inserted[0]) {
+            const rec = JSON.parse(localStorage.getItem('posOrders') || '[]');
+            const i = rec.findIndex(x => x.id === order.id);
+            if (i !== -1) { rec[i].id = inserted[0].id; localStorage.setItem('posOrders', JSON.stringify(rec)); }
+          }
+        } catch(e) { console.warn('pos order sync failed:', e); }
       }
       alert('Transaction Completed!\nTotal: ' + fmtCurrency(total) + '\nCash: ' + fmtCurrency(rec) + '\nChange: ' + fmtCurrency(rec - total));
       closeCashModal();
@@ -335,14 +350,12 @@ if (recentOrdersBody) {
 
   (async () => {
     let posOrders = [], onlineOrdersList = [], pendingCount = 0;
+    posOrders = (JSON.parse(localStorage.getItem('posOrders') || '[]')).map(o => ({ ...o, type: o.type || 'Walk-in', status: o.status || 'Completed' }));
+    const stored = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
     if (!sbClient || !sbClient.functions) {
-      posOrders = JSON.parse(localStorage.getItem('posOrders') || '[]');
-      const stored = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
       onlineOrdersList = stored.filter(o => String(o.status).toLowerCase() !== 'pending').map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date }));
       pendingCount = stored.filter(o => o.status === 'pending' || o.status === 'Pending').length;
     } else {
-      const { data: p } = await sb('pos_orders').select('*').order('date', { ascending: false });
-      posOrders = p || [];
       try {
         const { data, error } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
         if (!error) {
@@ -355,13 +368,20 @@ if (recentOrdersBody) {
           onlineOrdersList = all.filter(o => String(o.status).toLowerCase() !== 'pending');
         }
       } catch (e) {
-        const stored = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
         pendingCount = stored.filter(o => o.status === 'pending' || o.status === 'Pending').length;
         onlineOrdersList = stored.filter(o => String(o.status).toLowerCase() !== 'pending').map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date }));
       }
+      try {
+        const { data: p } = await sb('pos_orders').select('*').order('date', { ascending: false });
+        if (p && p.length) {
+          const sup = p.map(o => ({ id: o.id, customer: o.customer || 'Walk-in Customer', type: o.type || 'Walk-in', amount: o.amount, status: o.status || 'Completed', date: o.date }));
+          const ids = new Set(posOrders.map(x => String(x.id)));
+          sup.forEach(o => { if (!ids.has(String(o.id))) posOrders.push(o); });
+        }
+      } catch (e) {}
     }
 
-    const recentOrders = [...posOrders.map(o => ({ ...o, type: o.type || 'Walk-in' })), ...onlineOrdersList];
+    const recentOrders = [...posOrders, ...onlineOrdersList];
 
     const invProducts = await fetchAll('inventory');
     const lowStockItems = invProducts.filter(p => p.enabled && p.stock <= (p.threshold || 5));
@@ -690,6 +710,23 @@ if (ordersContainer && filterTabs.length > 0) {
     localStorage.setItem('onlineOrders', JSON.stringify(onlineOrders));
   }
 
+  async function deductStockByName(items) {
+    const inv = await fetchAll('inventory');
+    const imp = await fetchAll('imported_products');
+    let changedInv = false, changedImp = false;
+    (items || []).forEach(it => {
+      const qty = it.qty || 1;
+      const nm = String(it.name || '').trim().toLowerCase();
+      if (!nm) return;
+      const p = inv.find(x => x.name && String(x.name).toLowerCase() === nm);
+      if (p) { p.stock = Math.max(0, (p.stock || 0) - qty); changedInv = true; return; }
+      const pi = imp.find(x => x.name && String(x.name).toLowerCase() === nm);
+      if (pi) { pi.stock = Math.max(0, (pi.stock || 0) - qty); changedImp = true; }
+    });
+    if (changedInv) await upsertAll('inventory', inv);
+    if (changedImp) await upsertAll('imported_products', imp);
+  }
+
   async function callOrdersFn(action, order_id) {
     if (!sbClient || !sbClient.functions) return false;
     try {
@@ -746,6 +783,7 @@ if (ordersContainer && filterTabs.length > 0) {
     if (order.status === 'pending') footer.innerHTML = '<button class="btn btn-decline" onclick="declineOrder(\'' + order.id + '\')">Decline</button><button class="btn btn-primary" onclick="acceptOrder(\'' + order.id + '\')">Accept</button>';
     else if (order.status === 'shipped') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
     else if (order.status === 'delivered') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
+    else footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button>';
     modal.style.display = 'flex';
   };
 
@@ -753,7 +791,10 @@ if (ordersContainer && filterTabs.length > 0) {
   window.acceptOrder = async (id) => {
     await callOrdersFn('accept', id);
     const o = onlineOrders.find(x => x.id === id);
-    if (o) { o.status = 'shipped'; persistOnlineOrders(); }
+    if (o) {
+      await deductStockByName(o.items);
+      o.status = 'shipped'; persistOnlineOrders();
+    }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
   };
@@ -773,15 +814,8 @@ if (ordersContainer && filterTabs.length > 0) {
   };
   window.finishOrder = async (id) => {
     await callOrdersFn('finish', id);
-    const idx = onlineOrders.findIndex(o => o.id === id);
-    if (idx !== -1) {
-      const order = onlineOrders[idx];
-      const c = JSON.parse(localStorage.getItem('completedOrders') || '[]');
-      c.unshift({ id: order.id, customer: order.customer, type: 'Online', amount: order.amount, status: 'Completed', date: getTodayStr() });
-      localStorage.setItem('completedOrders', JSON.stringify(c));
-      onlineOrders.splice(idx, 1);
-      persistOnlineOrders();
-    }
+    const o = onlineOrders.find(x => x.id === id);
+    if (o) { o.status = 'completed'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
   };

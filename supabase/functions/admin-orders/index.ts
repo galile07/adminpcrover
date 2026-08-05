@@ -25,7 +25,6 @@ Deno.serve(async (req) => {
     const { data: orders, error } = await supabase
       .from("orders")
       .select("*")
-      .not("status", "eq", "completed")
       .order("created_at", { ascending: false });
     if (error) return json({ error: error.message }, 500, corsHeaders);
 

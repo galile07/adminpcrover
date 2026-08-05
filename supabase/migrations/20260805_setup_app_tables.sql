@@ -1,16 +1,14 @@
 -- ============================================================
--- PCROVER ADMIN — Final table fix (policies already exist)
+-- PCROVER ADMIN — idempotent schema fix (safe to re-run)
 -- Run in Supabase Dashboard → SQL Editor
 -- ============================================================
 
--- imported_products: add missing columns
-ALTER TABLE imported_products ADD COLUMN IF NOT EXISTS image TEXT DEFAULT '';
-ALTER TABLE imported_products ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
-ALTER TABLE imported_products ADD COLUMN IF NOT EXISTS threshold INT DEFAULT 5;
+-- 1. Missing columns (no-op if already present)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS customer_name TEXT DEFAULT '';
+ALTER TABLE imported_products ADD COLUMN IF NOT EXISTS category TEXT DEFAULT '';
 
--- pos_orders: recreate with columns the app actually uses
-DROP TABLE IF EXISTS pos_orders;
-CREATE TABLE pos_orders (
+-- 2. Tables with the exact columns the app uses
+CREATE TABLE IF NOT EXISTS pos_orders (
   id BIGSERIAL PRIMARY KEY,
   customer TEXT DEFAULT 'Walk-in Customer',
   type TEXT DEFAULT 'Walk-in',
@@ -19,9 +17,7 @@ CREATE TABLE pos_orders (
   date TEXT DEFAULT ''
 );
 
--- auto_rules: recreate with columns the app actually uses
-DROP TABLE IF EXISTS auto_rules;
-CREATE TABLE auto_rules (
+CREATE TABLE IF NOT EXISTS auto_rules (
   id BIGSERIAL PRIMARY KEY,
   name TEXT DEFAULT '',
   direction TEXT DEFAULT 'add',
@@ -32,3 +28,13 @@ CREATE TABLE auto_rules (
   adjusttype TEXT DEFAULT 'percent',
   enabled BOOLEAN DEFAULT true
 );
+
+-- 3. RLS policies (drop + recreate so they always exist)
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['imported_products','inventory','pos_orders','auto_rules'] LOOP
+    EXECUTE format('DROP POLICY IF EXISTS "anon all %I" ON %I', t, t);
+    EXECUTE format('CREATE POLICY "anon all %I" ON %I FOR ALL USING (true) WITH CHECK (true)', t, t);
+  END LOOP;
+END $$;

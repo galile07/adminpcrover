@@ -633,7 +633,8 @@ if (ordersContainer && filterTabs.length > 0) {
       console.log('Orders fetched:', data);
       const orders = (data && data.orders) || [];
       const mapped = orders.map(o => ({
-        id: o.id, customer: o.customer_name || 'Customer', address: o.address || '',
+        id: o.id, code: String(o.id || '').toUpperCase().slice(0, 8),
+        customer: o.customer_name || 'Customer', address: o.address || '',
         phone: o.phone || '', email: o.email || '',
         amount: o.total || 0,
         status: String(o.status || 'pending').toLowerCase(),
@@ -653,7 +654,7 @@ if (ordersContainer && filterTabs.length > 0) {
 
   function renderOrders(filterStatus) {
     const filtered = onlineOrders.filter(o => o.status === filterStatus).sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
-    ordersContainer.innerHTML = filtered.map(order => '<div class="order-card"><div class="order-card-top"><div><span class="order-id">' + order.id + '</span><span class="order-time">' + order.date + ' ' + order.time + '</span></div><button class="btn-view" onclick="viewOrder(\'' + order.id + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + order.customer + '</div><div class="order-address">' + order.address + '</div></div></div>').join('');
+    ordersContainer.innerHTML = filtered.map(order => '<div class="order-card"><div class="order-card-top"><div><span class="order-id">#' + (order.code || order.id) + '</span><span class="order-time">' + order.date + ' ' + order.time + '</span></div><button class="btn-view" onclick="viewOrder(\'' + order.id + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + order.customer + '</div><div class="order-address">' + order.address + '</div></div></div>').join('');
   }
 
   window.viewOrder = (id) => {
@@ -661,7 +662,7 @@ if (ordersContainer && filterTabs.length > 0) {
     if (!order) return;
     const modal = document.getElementById('orderModal'), body = document.getElementById('modalBody'), footer = document.getElementById('modalFooter');
     const itemsHtml = order.items.map(item => '<tr><td>' + item.name + '</td><td>' + item.qty + '</td><td>' + fmtCurrency(item.price) + '</td><td>' + fmtCurrency(item.qty * item.price) + '</td></tr>').join('');
-    body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>' + order.id + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + order.date + ' ' + order.time + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + order.customer + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + order.address + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + order.phone + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + order.email + '</span></div><h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
+    body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + (order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + order.date + ' ' + order.time + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + order.customer + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + order.address + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + order.phone + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + order.email + '</span></div><h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
     if (order.status === 'pending') footer.innerHTML = '<button class="btn btn-decline" onclick="declineOrder(\'' + order.id + '\')">Decline</button><button class="btn btn-primary" onclick="acceptOrder(\'' + order.id + '\')">Accept</button>';
     else if (order.status === 'shipped') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
     else if (order.status === 'delivered') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';

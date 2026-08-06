@@ -758,6 +758,16 @@ if (ordersContainer && filterTabs.length > 0) {
     } catch (e) { console.warn('admin-orders call failed:', e); return false; }
   }
 
+  function orderDateTime(iso) {
+    if (!iso) return { date: getTodayStr(), time: '12:00 PM' };
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return { date: String(iso).slice(0, 10), time: '12:00 PM' };
+    return {
+      date: d.toLocaleDateString('en-CA'),
+      time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    };
+  }
+
   async function fetchOnlineOrders() {
     const raw = localStorage.getItem('onlineOrders');
     const local = raw ? JSON.parse(raw) : [];
@@ -768,15 +778,18 @@ if (ordersContainer && filterTabs.length > 0) {
       if (error) throw error;
       console.log('Orders fetched:', data);
       const orders = (data && data.orders) || [];
-      const mapped = orders.map(o => ({
-        id: o.id, code: String(o.id || '').toUpperCase().slice(0, 8),
-        customer: pickName(o.customer_name) || 'Customer', address: o.address || '',
-        phone: o.phone || '', email: o.email || '',
-        amount: o.total || 0,
-        status: String(o.status || 'pending').toLowerCase(),
-        date: (o.created_at || getTodayStr()).slice(0, 10), time: '12:00 PM',
-        items: parseOrderItems(o.items)
-      }));
+      const mapped = orders.map(o => {
+        const dt = orderDateTime(o.created_at);
+        return {
+          id: o.id, code: String(o.id || '').toUpperCase().slice(0, 8),
+          customer: pickName(o.customer_name) || 'Customer', address: o.address || '',
+          phone: o.phone || '', email: o.email || '',
+          amount: o.total || 0,
+          status: String(o.status || 'pending').toLowerCase(),
+          date: dt.date, time: dt.time,
+          items: parseOrderItems(o.items)
+        };
+      });
       if (mapped.length) localStorage.setItem('onlineOrders', JSON.stringify(mapped));
       else localStorage.removeItem('onlineOrders');
       return mapped;

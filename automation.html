@@ -24,6 +24,7 @@
         <a href="orders.html" class="nav-link"><span>Online Orders</span></a>
         <a href="inventory.html" class="nav-link"><span>Inventory</span></a>
         <a href="automation.html" class="nav-link active"><span>Price Automation</span></a>
+        <a href="sync.html" class="nav-link"><span>Sync Settings</span></a>
       </nav>
     </aside>
     <main class="main-content">
@@ -51,20 +52,6 @@
             </thead>
             <tbody id="rulesTableBody"></tbody>
           </table>
-        </div>
-
-        <div class="card table-card" style="margin-top:24px;">
-          <div class="section-heading" style="padding:16px 20px;border-bottom:1px solid #eee;">
-            <h2 style="color:var(--pc-blue);">Sync Settings</h2>
-          </div>
-          <div style="padding:20px;">
-            <p style="color:#555;line-height:1.6;margin-bottom:16px;">Connect your Lazada seller account, then sync to pull your Lazada orders and products into the admin.</p>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <button class="btn btn-primary" onclick="connectLazada()">Connect Lazada</button>
-              <button id="syncLazadaBtn" class="btn btn-secondary" onclick="syncLazada()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Sync Lazada</button>
-            </div>
-            <p id="lazadaSyncStatus" style="color:#555;margin-top:16px;white-space:pre-line;line-height:1.6;"></p>
-          </div>
         </div>
 
       </section>

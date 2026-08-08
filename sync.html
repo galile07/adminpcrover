@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PCROVER Sync Settings</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="stylesheet" href="css/styles.css?v=13" />
+</head>
+<body class="page-dashboard">
+  <div class="layout-shell">
+    <aside class="sidebar">
+      <div class="login-brand">
+        <div class="brand-mark">PC</div>
+        <div>
+          <span class="brand-title">ROVER</span>
+          <span class="brand-sub">BALIUAG</span>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
+        <a href="pos.html" class="nav-link"><span>POS System</span></a>
+        <a href="orders.html" class="nav-link"><span>Online Orders</span></a>
+        <a href="inventory.html" class="nav-link"><span>Inventory</span></a>
+        <a href="automation.html" class="nav-link"><span>Price Automation</span></a>
+        <a href="sync.html" class="nav-link active"><span>Sync Settings</span></a>
+      </nav>
+    </aside>
+    <main class="main-content">
+      <header class="header">
+        <div class="header-info">Sync Settings</div>
+        <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
+      </header>
+      <section class="page-content">
+        <div class="section-heading">
+          <h2>Sync Settings</h2>
+        </div>
+
+        <div class="card table-card">
+          <div class="section-heading" style="padding:16px 20px;border-bottom:1px solid #eee;">
+            <h2 style="color:var(--pc-blue);">Lazada</h2>
+          </div>
+          <div style="padding:20px;">
+            <p style="color:#555;line-height:1.6;margin-bottom:16px;">Connect your Lazada seller account, then sync to pull your Lazada orders and products into the admin.</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="connectLazada()">Connect Lazada</button>
+              <button id="syncLazadaBtn" class="btn btn-secondary" onclick="syncLazada()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Sync Lazada</button>
+            </div>
+            <p id="lazadaSyncStatus" style="color:#555;margin-top:16px;white-space:pre-line;line-height:1.6;"></p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="js/script.js?v=17"></script>
+</body>
+</html>

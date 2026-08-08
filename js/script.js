@@ -110,6 +110,40 @@ function ruleAdjustedPrice(product) {
 }
 
 // ==========================================
+// LAZADA SYNC (global)
+// ==========================================
+function setLazadaSync(msg) {
+  const el = document.getElementById('lazadaSyncStatus');
+  if (el) { el.textContent = msg; return; }
+  alert(msg);
+}
+window.connectLazada = () => {
+  const cb = 'https://galile07.github.io/adminpcrover/lazada-callback.html';
+  window.open('https://auth.lazada.com/oauth/authorize?response_type=code&force_auth=true&redirect_uri=' + encodeURIComponent(cb) + '&client_id=140929', '_blank');
+};
+window.syncLazada = async () => {
+  if (!sbClient || !sbClient.functions) { setLazadaSync('Supabase is not available.'); return; }
+  const btn = document.getElementById('syncLazadaBtn');
+  const old = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Syncing...'; }
+  try {
+    const { data, error } = await sbClient.functions.invoke('lazada-sync', { method: 'GET' });
+    if (error) throw error;
+    if (!data || !data.ok) { setLazadaSync('Sync failed: ' + ((data && data.message) || (data && data.error) || 'unknown')); return; }
+    let msg = 'Synced ' + data.synced + ' new Lazada order(s). Skipped ' + data.skipped + ' already-imported.';
+    if (data.products !== null && data.products !== undefined) {
+      msg += '\nProducts: ' + data.products + ' synced/updated.' + (data.products_error ? ' (error: ' + data.products_error + ')' : '');
+    }
+    setLazadaSync(msg);
+    if (window.__refreshOrders) await window.__refreshOrders();
+  } catch (e) {
+    setLazadaSync('Sync failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = old; }
+  }
+};
+
+// ==========================================
 // HELPERS: currency / date
 // ==========================================
 const fmtCurrency = (a) => '₱' + a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -852,32 +886,9 @@ if (ordersContainer && filterTabs.length > 0) {
     closeOrderModal();
   };
 
-  window.connectLazada = () => {
-    const cb = 'https://galile07.github.io/adminpcrover/lazada-callback.html';
-    window.open('https://auth.lazada.com/oauth/authorize?response_type=code&force_auth=true&redirect_uri=' + encodeURIComponent(cb) + '&client_id=140929', '_blank');
-  };
-
-  window.syncLazada = async () => {
-    if (!sbClient || !sbClient.functions) { alert('Supabase is not available.'); return; }
-    const btn = document.querySelector('.header .btn-primary');
-    const old = btn ? btn.textContent : '';
-    if (btn) { btn.disabled = true; btn.textContent = 'Syncing...'; }
-    try {
-      const { data, error } = await sbClient.functions.invoke('lazada-sync', { method: 'GET' });
-      if (error) throw error;
-      if (!data || !data.ok) { alert('Sync failed: ' + ((data && data.message) || (data && data.error) || 'unknown')); return; }
-      let msg = 'Synced ' + data.synced + ' new Lazada order(s). Skipped ' + data.skipped + ' already-imported.';
-      if (data.products !== null && data.products !== undefined) {
-        msg += '\nProducts: ' + data.products + ' synced/updated.' + (data.products_error ? ' (error: ' + data.products_error + ')' : '');
-      }
-      alert(msg);
-      onlineOrders = await fetchOnlineOrders();
-      renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
-    } catch (e) {
-      alert('Sync failed: ' + e.message);
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = old; }
-    }
+  window.__refreshOrders = async () => {
+    onlineOrders = await fetchOnlineOrders();
+    renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
   };
 
   filterTabs.forEach(tab => {

@@ -69,6 +69,51 @@ async function getValidAccessToken(supabase: any) {
   return { access_token, refresh_token };
 }
 
+function imgOf(images: any): string {
+  if (!Array.isArray(images) || !images.length) return "";
+  const first = images[0];
+  return typeof first === "string" ? first : (first && (first.url || first.image_url)) || "";
+}
+
+async function syncProducts(supabase: any, access_token: string) {
+  let offset = 0;
+  let total = null as number | null;
+  let upserted = 0;
+  for (let page = 0; page < 10; page++) {
+    const params: Record<string, string> = {
+      app_key: APP_KEY,
+      access_token,
+      sign_method: "sha256",
+      timestamp: String(Date.now()),
+      offset: String(offset),
+      limit: "100",
+    };
+    const d = await lazadaGet("/products/get", params);
+    if (!d || (d.code && d.code !== "0" && !d.data)) break;
+    const data = d.data || {};
+    const products = data.products || [];
+    if (total === null) total = Number(data.total_products) || 0;
+    if (!products.length) break;
+    const rows = products.map((p: any) => ({
+      lazada_item_id: String(p.item_id),
+      name: p.name || p.seller_sku || "Item",
+      price: Number(p.price) || 0,
+      stock: Number(p.quantity) || 0,
+      enabled: String(p.status).toLowerCase() !== "inactive",
+      image: imgOf(p.images),
+      description: p.short_description || "",
+      threshold: 5,
+      category: "",
+    }));
+    const { error } = await supabase.from("imported_products").upsert(rows, { onConflict: "lazada_item_id" });
+    if (error) return { error: error.message, upserted };
+    upserted += rows.length;
+    offset += products.length;
+    if (offset >= total) break;
+  }
+  return { error: null, upserted };
+}
+
 function dayStr(d: Date) {
   return d.toISOString().slice(0, 10);
 }
@@ -146,5 +191,15 @@ Deno.serve(async (req) => {
     inserted++;
   }
 
-  return json({ ok: true, synced: inserted, skipped: skipped.length, total: orders.length, refresh_token_present: Boolean(refresh_token) }, 200, cors);
+  const prodResult = await syncProducts(supabase, access_token);
+
+  return json({
+    ok: true,
+    synced: inserted,
+    skipped: skipped.length,
+    total: orders.length,
+    products: prodResult.error ? null : prodResult.upserted,
+    products_error: prodResult.error,
+    refresh_token_present: Boolean(refresh_token),
+  }, 200, cors);
 });

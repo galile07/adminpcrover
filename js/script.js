@@ -866,7 +866,11 @@ if (ordersContainer && filterTabs.length > 0) {
       const { data, error } = await sbClient.functions.invoke('lazada-sync', { method: 'GET' });
       if (error) throw error;
       if (!data || !data.ok) { alert('Sync failed: ' + ((data && data.message) || (data && data.error) || 'unknown')); return; }
-      alert('Synced ' + data.synced + ' new Lazada order(s). Skipped ' + data.skipped + ' already-imported.');
+      let msg = 'Synced ' + data.synced + ' new Lazada order(s). Skipped ' + data.skipped + ' already-imported.';
+      if (data.products !== null && data.products !== undefined) {
+        msg += '\nProducts: ' + data.products + ' synced/updated.' + (data.products_error ? ' (error: ' + data.products_error + ')' : '');
+      }
+      alert(msg);
       onlineOrders = await fetchOnlineOrders();
       renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     } catch (e) {

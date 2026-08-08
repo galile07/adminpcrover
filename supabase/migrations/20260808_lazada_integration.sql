@@ -17,3 +17,7 @@ ALTER TABLE lazada_tokens ENABLE ROW LEVEL SECURITY;
 
 -- Mark which orders came from Lazada so re-syncs never duplicate them
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS lazada_order_id TEXT DEFAULT NULL;
+
+-- Track Lazada items so re-syncs update instead of duplicating products
+ALTER TABLE imported_products ADD COLUMN IF NOT EXISTS lazada_item_id TEXT DEFAULT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS imported_products_lazada_item_id_idx ON imported_products (lazada_item_id);

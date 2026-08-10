@@ -754,25 +754,24 @@ setTimeout(async () => {
   } catch (e) { console.warn('Seed failed:', e); }
 }, 500);
 
-// Auto-seed imported products if empty
-setTimeout(async () => {
+// One-time cleanup: remove legacy sample imported products from cache + backend
+(function removeSampleImportedProducts() {
+  const samples = ['Ergonomic Keyboard', 'Portable Monitor 15.6"', 'Desk Mount Dual Arm', 'Noise Canceling Earbuds'];
+  const lower = samples.map(s => s.toLowerCase());
   try {
-    let imp = await fetchAll('imported_products');
-    if (imp && imp.length === 0) {
-      const d = [
-        { name: 'Ergonomic Keyboard', price: 3200, stock: 8, description: 'Split ergonomic keyboard with mechanical switches for comfortable typing.' },
-        { name: 'Portable Monitor 15.6"', price: 7200, stock: 5, description: 'USB-C portable monitor perfect for dual-screen setups on the go.' },
-        { name: 'Desk Mount Dual Arm', price: 3800, stock: 6, description: 'Heavy-duty dual monitor desk mount with gas spring adjustment.' },
-        { name: 'Noise Canceling Earbuds', price: 4600, stock: 12, description: 'True wireless earbuds with active noise canceling and 24h battery.' }
-      ];
-      for (let item of d) {
-        imp.push({ id: imp.length + 1, ...item, threshold: 5, enabled: true, image: '', category: guessCategory(item.name) });
+    const raw = localStorage.getItem('imported_products');
+    if (raw) {
+      const rows = JSON.parse(raw);
+      const kept = rows.filter(p => !lower.includes(String(p.name || '').trim().toLowerCase()));
+      if (kept.length !== rows.length) {
+        localStorage.setItem('imported_products', JSON.stringify(kept));
+        if (sbClient) {
+          sb('imported_products').delete().in('name', samples).then(() => {}).catch(() => {});
+        }
       }
-      await upsertAll('imported_products', imp);
-      if (document.getElementById('inventoryTableBody')) renderInv();
     }
-  } catch (e) { console.warn('Imported seed failed:', e); }
-}, 600);
+  } catch (e) {}
+})();
 // ==========================================
 // 5. ONLINE ORDERS
 // ==========================================

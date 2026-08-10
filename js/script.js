@@ -117,6 +117,53 @@ function setLazadaSync(msg) {
   if (el) { el.textContent = msg; return; }
   alert(msg);
 }
+function lazadaErrorMsg(err, data) {
+  if (data && (data.message || data.error)) return (data.message || data.error);
+  if (err && err.context) {
+    try {
+      const b = JSON.parse(err.context.response.text());
+      if (b && (b.message || b.error)) return b.message || b.error;
+    } catch (e) {}
+  }
+  return (err && err.message) || 'unknown error';
+}
+window.checkLazadaStatus = async () => {
+  if (!sbClient || !sbClient.functions) return;
+  const pill = document.getElementById('lazadaStatusPill');
+  const sub = document.getElementById('lazadaStatusSub');
+  if (!pill) return;
+  try {
+    const { data, error } = await sbClient.functions.invoke('lazada-status', { method: 'GET' });
+    if (error || !data || !data.ok) {
+      pill.textContent = 'Connection unknown';
+      pill.className = 'status-pill status-unknown';
+      return;
+    }
+    if (data.connected && !data.refresh_expired) {
+      pill.textContent = 'Connected';
+      pill.className = 'status-pill status-connected';
+      if (sub) {
+        const dt = data.connected_at ? new Date(data.connected_at).toLocaleString() : '';
+        sub.textContent = 'Lazada seller account linked' + (dt ? ' since ' + dt : '') + '.';
+      }
+      const connectBtn = document.getElementById('connectLazadaBtn');
+      if (connectBtn) {
+        connectBtn.textContent = 'Reconnect';
+        connectBtn.classList.add('btn-secondary');
+        connectBtn.classList.remove('btn-primary');
+      }
+    } else {
+      pill.textContent = data.refresh_expired ? 'Reconnect needed' : 'Not connected';
+      pill.className = 'status-pill ' + (data.refresh_expired ? 'status-warning' : 'status-off');
+      if (sub) sub.textContent = data.refresh_expired
+        ? 'The connection expired. Click Reconnect to link your account again.'
+        : 'Click Connect Lazada and authorize your seller account.';
+    }
+  } catch (e) {
+    pill.textContent = 'Connection unknown';
+    pill.className = 'status-pill status-unknown';
+  }
+};
 window.connectLazada = () => {
   const cb = 'https://galile07.github.io/adminpcrover/lazada-callback.html';
   window.open('https://auth.lazada.com/oauth/authorize?response_type=code&force_auth=true&redirect_uri=' + encodeURIComponent(cb) + '&client_id=140929', '_blank');
@@ -129,15 +176,16 @@ window.syncLazada = async () => {
   try {
     const { data, error } = await sbClient.functions.invoke('lazada-sync', { method: 'GET' });
     if (error) throw error;
-    if (!data || !data.ok) { setLazadaSync('Sync failed: ' + ((data && data.message) || (data && data.error) || 'unknown')); return; }
+    if (!data || !data.ok) { setLazadaSync('Sync failed: ' + lazadaErrorMsg(null, data)); window.checkLazadaStatus(); return; }
     let msg = 'Synced ' + data.synced + ' new Lazada order(s). Skipped ' + data.skipped + ' already-imported.';
     if (data.products !== null && data.products !== undefined) {
       msg += '\nProducts: ' + data.products + ' synced/updated.' + (data.products_error ? ' (error: ' + data.products_error + ')' : '');
     }
     setLazadaSync(msg);
+    window.checkLazadaStatus();
     if (window.__refreshOrders) await window.__refreshOrders();
   } catch (e) {
-    setLazadaSync('Sync failed: ' + e.message);
+    setLazadaSync('Sync failed: ' + lazadaErrorMsg(e));
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = old; }
   }

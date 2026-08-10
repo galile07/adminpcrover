@@ -460,6 +460,10 @@ button, input { outline: none; border: none; font-family: inherit; }
 .status-pill.low { background-color: #f8d7da; color: #842029; }
 .status-pill.warn { background-color: #fff3cd; color: #856404; }
 .status-pill.danger { background-color: #f8d7da; color: #842029; }
+.status-pill.status-connected { background-color: #d4edda; color: #155724; }
+.status-pill.status-off { background-color: #e2e3e5; color: #383d41; }
+.status-pill.status-warning { background-color: #fff3cd; color: #856404; }
+.status-pill.status-unknown { background-color: #e2e3e5; color: #6c757d; }
 
 .price-rule { color: #f26f21; font-weight: 700; }
 .price-base { font-size: 11px; color: #999; text-decoration: line-through; margin-top: 2px; }

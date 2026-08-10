@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
 
   const { access_token, refresh_token } = await getValidAccessToken(supabase);
   if (!access_token) {
-    return json({ ok: false, error: "not_connected", message: "Lazada is not connected yet. Use Connect Lazada first." }, 400, cors);
+    return json({ ok: false, error: "not_connected", message: "Lazada is not connected yet. Click Connect Lazada, authorize the account, then sync again." }, 200, cors);
   }
 
   const now = new Date();
@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
 
   const data = await lazadaGet("/orders/get", params);
   if (!data || (data.code && data.code !== "0" && !data.data)) {
-    return json({ ok: false, error: data.code || "lazada_error", message: data.message || "Failed to fetch orders" }, 502, cors);
+    return json({ ok: false, error: data.code || "lazada_error", message: data.message || "Failed to fetch orders" }, 200, cors);
   }
 
   const orders = (data.data && data.data.orders) || [];

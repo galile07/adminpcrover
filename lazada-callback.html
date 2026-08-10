@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Lazada Connect</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=13" />
+  <link rel="stylesheet" href="css/styles.css?v=14" />
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
     <main class="main-content" style="margin-left:0;">
       <header class="header">
         <div class="header-info">Lazada Connection</div>
-        <button class="btn btn-secondary" onclick="location.href='orders.html'">Back to Online Orders</button>
+        <button class="btn btn-secondary" onclick="location.href='sync.html'">Back to Sync Settings</button>
       </header>
       <section class="page-content" style="max-width:560px;margin:40px auto;">
         <div class="card" style="padding:24px;">
@@ -21,10 +21,6 @@
           <div id="connectBox" style="display:none;margin-top:20px;">
             <p style="color:#555;margin-bottom:12px;">Click below to authorize the Lazada seller account. After authorizing you will be brought back here automatically.</p>
             <a href="https://auth.lazada.com/oauth/authorize?response_type=code&force_auth=true&redirect_uri=https%3A%2F%2Fgalile07.github.io%2Fadminpcrover%2Flazada-callback.html&client_id=140929" class="btn btn-primary" style="text-decoration:none;display:inline-block;">Connect Lazada</a>
-          </div>
-          <div id="syncBox" style="display:none;margin-top:20px;">
-            <button class="btn btn-primary" onclick="syncLazada()">Sync Lazada Orders Now</button>
-            <p id="syncResult" style="color:#555;margin-top:10px;"></p>
           </div>
         </div>
       </section>
@@ -44,24 +40,8 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code })
       });
-      return res.json();
-    }
-
-    async function syncLazada() {
-      const btn = document.getElementById('syncBox').querySelector('button');
-      btn.disabled = true;
-      btn.textContent = 'Syncing...';
-      const out = document.getElementById('syncResult');
-      try {
-        const res = await fetch(FN_BASE + '/lazada-sync', { method: 'GET' });
-        const d = await res.json();
-        if (d.ok) out.textContent = 'Synced ' + d.synced + ' new Lazada order(s) (skipped ' + d.skipped + ' already-imported).';
-        else out.textContent = 'Sync failed: ' + (d.message || d.error);
-      } catch (e) {
-        out.textContent = 'Sync failed: ' + e;
-      }
-      btn.disabled = false;
-      btn.textContent = 'Sync Lazada Orders Now';
+      const d = await res.json().catch(() => ({}));
+      return d.ok ? d : { ok: false, message: (d && d.message) || ('HTTP ' + res.status) };
     }
 
     (async () => {
@@ -81,10 +61,12 @@
       try {
         const d = await exchangeCode(code);
         if (d.ok) {
-          setStatus('Lazada connected!', 'Your Lazada seller account is now linked. You can sync orders below or from the Online Orders page.');
-          document.getElementById('syncBox').style.display = 'block';
+          setStatus('Lazada connected!', 'Your Lazada seller account is linked. Redirecting to the admin...');
+          setTimeout(function () {
+            window.location.href = 'sync.html?connected=1';
+          }, 1200);
         } else {
-          setStatus('Connection failed', (d.message || '') + ' (' + (d.error || 'unknown') + '). If the code is expired, authorize again.');
+          setStatus('Connection failed', (d.message || '') + '. If the code is expired, authorize again.');
           document.getElementById('connectBox').style.display = 'block';
         }
       } catch (e) {

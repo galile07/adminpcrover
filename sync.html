@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Sync Settings</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=14" />
+  <link rel="stylesheet" href="css/styles.css?v=15" />
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
@@ -40,6 +40,11 @@
           Lazada connected successfully! Your seller account is now linked to the system.
         </div>
 
+        <div id="lazadaSyncCue" class="sync-cue" style="display:none;">
+          <span class="sync-cue-icon">&#10003;</span>
+          <span class="sync-cue-text">Lazada synced to this system</span>
+        </div>
+
         <div class="card table-card">
           <div class="section-heading" style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">
             <h2 style="color:var(--pc-blue);">Lazada</h2>
@@ -59,7 +64,7 @@
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=19"></script>
+  <script src="js/script.js?v=20"></script>
   <script>
     (function () {
       if (new URLSearchParams(window.location.search).get('connected') === '1') {

@@ -131,6 +131,7 @@ window.checkLazadaStatus = async () => {
   if (!sbClient || !sbClient.functions) return;
   const pill = document.getElementById('lazadaStatusPill');
   const sub = document.getElementById('lazadaStatusSub');
+  const syncCue = document.getElementById('lazadaSyncCue');
   if (!pill) return;
   try {
     const { data, error } = await sbClient.functions.invoke('lazada-status', { method: 'GET' });
@@ -139,12 +140,21 @@ window.checkLazadaStatus = async () => {
       pill.className = 'status-pill status-unknown';
       return;
     }
+    const fmt = (ts) => ts ? new Date(ts).toLocaleString() : '';
     if (data.connected && !data.refresh_expired) {
       pill.textContent = 'Connected';
       pill.className = 'status-pill status-connected';
       if (sub) {
-        const dt = data.connected_at ? new Date(data.connected_at).toLocaleString() : '';
+        const dt = fmt(data.connected_at);
         sub.textContent = 'Lazada seller account linked' + (dt ? ' since ' + dt : '') + '.';
+      }
+      if (syncCue) {
+        if (data.last_synced_at) {
+          syncCue.style.display = 'flex';
+          syncCue.querySelector('.sync-cue-text').textContent = 'Lazada synced to this system — last sync ' + fmt(data.last_synced_at);
+        } else {
+          syncCue.style.display = 'none';
+        }
       }
       const connectBtn = document.getElementById('connectLazadaBtn');
       if (connectBtn) {
@@ -158,6 +168,7 @@ window.checkLazadaStatus = async () => {
       if (sub) sub.textContent = data.refresh_expired
         ? 'The connection expired. Click Reconnect to link your account again.'
         : 'Click Connect Lazada and authorize your seller account.';
+      if (syncCue) syncCue.style.display = 'none';
     }
   } catch (e) {
     pill.textContent = 'Connection unknown';
@@ -725,34 +736,28 @@ if (inventoryTableBody) {
   renderInv();
 }
 
-// Auto-seed inventory if empty
-setTimeout(async () => {
+// One-time cleanup: remove legacy sample inventory products from cache + backend
+(function removeSampleInventory() {
+  const samples = [
+    'Wireless Mouse', 'Gaming Chair', 'Monitor Arm', 'RGB Strip', 'External HDD 2TB',
+    'Mechanical Numpad', 'USB Microphone', 'LED Desk Lamp', 'Cable Mgmt Kit', 'Cooling Pad',
+    'Wireless Charger', 'Stream Deck'
+  ];
+  const lower = samples.map(s => s.toLowerCase());
   try {
-    let items = await fetchAll('inventory');
-    if (items && items.length === 0) {
-      const d = [
-        { name: 'Wireless Mouse', price: 750, stock: 18, threshold: 6, description: 'Reliable wireless mouse with ergonomic design, perfect for daily office use.' },
-        { name: 'Gaming Chair', price: 12500, stock: 4, threshold: 2, description: 'High-back ergonomic gaming chair with lumbar support and adjustable armrests.' },
-        { name: 'Monitor Arm', price: 2200, stock: 9, threshold: 4, description: 'Adjustable gas-spring monitor arm for a cleaner, more ergonomic desk setup.' },
-        { name: 'RGB Strip', price: 550, stock: 40, threshold: 10, description: 'Colorful RGB LED strip with remote control, ideal for gaming ambiance.' },
-        { name: 'External HDD 2TB', price: 2800, stock: 11, threshold: 4, description: 'Portable 2TB external hard drive for backups and extra storage on the go.' },
-        { name: 'Mechanical Numpad', price: 950, stock: 14, threshold: 5, description: 'Compact mechanical numeric keypad with blue switches for fast data entry.' },
-        { name: 'USB Microphone', price: 3200, stock: 7, threshold: 3, description: 'Plug-and-play condenser microphone with crystal-clear audio for streaming.' },
-        { name: 'LED Desk Lamp', price: 1100, stock: 16, threshold: 5, description: 'Touch-controlled LED desk lamp with adjustable brightness and color temperature.' },
-        { name: 'Cable Mgmt Kit', price: 350, stock: 35, threshold: 10, description: 'Complete cable management kit with clips, sleeves, and ties for a tidy workspace.' },
-        { name: 'Cooling Pad', price: 1500, stock: 10, threshold: 4, description: 'Laptop cooling pad with dual silent fans to prevent overheating during long sessions.' },
-        { name: 'Wireless Charger', price: 680, stock: 22, threshold: 8, description: 'Fast wireless charging pad compatible with all Qi-enabled devices.' },
-        { name: 'Stream Deck', price: 5900, stock: 5, threshold: 2, description: 'Customizable macro keypad for streamers and content creators to control scenes and apps.' }
-      ];
-      for (let item of d) {
-        items.push({id: items.length + 1, ...item, enabled: true, image: '', category: guessCategory(item.name)});
+    const raw = localStorage.getItem('inventory');
+    if (raw) {
+      const rows = JSON.parse(raw);
+      const kept = rows.filter(p => !lower.includes(String(p.name || '').trim().toLowerCase()));
+      if (kept.length !== rows.length) {
+        localStorage.setItem('inventory', JSON.stringify(kept));
+        if (sbClient) {
+          sb('inventory').delete().in('name', samples).then(() => {}).catch(() => {});
+        }
       }
-      await upsertAll('inventory', items);
-      if (document.getElementById('inventoryTableBody')) renderInv();
-      if (document.querySelector('.pos-grid')) loadAndRenderPOS();
     }
-  } catch (e) { console.warn('Seed failed:', e); }
-}, 500);
+  } catch (e) {}
+})();
 
 // One-time cleanup: remove legacy sample imported products from cache + backend
 (function removeSampleImportedProducts() {

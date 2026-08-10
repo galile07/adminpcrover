@@ -253,6 +253,8 @@ Deno.serve(async (req) => {
 
   const prodResult = await syncProducts(supabase, access_token);
 
+  await supabase.from("lazada_tokens").update({ last_synced_at: new Date().toISOString() }).eq("id", 1).maybeSingle();
+
   return json({
     ok: true,
     synced: inserted,

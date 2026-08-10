@@ -465,6 +465,9 @@ button, input { outline: none; border: none; font-family: inherit; }
 .status-pill.status-warning { background-color: #fff3cd; color: #856404; }
 .status-pill.status-unknown { background-color: #e2e3e5; color: #6c757d; }
 
+.sync-cue { display: flex; align-items: center; gap: 10px; background: #e6f4ea; border: 1px solid #34a853; color: #1e7e34; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-weight: 600; }
+.sync-cue-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #34a853; color: #fff; font-size: 13px; line-height: 1; flex-shrink: 0; }
+
 .price-rule { color: #f26f21; font-weight: 700; }
 .price-base { font-size: 11px; color: #999; text-decoration: line-through; margin-top: 2px; }
 

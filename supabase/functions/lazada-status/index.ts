@@ -36,6 +36,7 @@ Deno.serve(async (req) => {
     expired,
     refresh_expired: refreshExpired,
     connected_at: tok?.updated_at ?? null,
+    last_synced_at: tok?.last_synced_at ?? null,
     access_expires_at: tok?.expires_at ?? null,
     refresh_expires_at: tok?.refresh_expires_at ?? null,
   }), {

@@ -6,7 +6,6 @@
   <title>PCROVER Inventory Management</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="css/styles.css?v=15" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
@@ -36,7 +35,6 @@
           <div class="section-heading">
             <h2>Products</h2>
             <div style="display:flex;gap:10px;">
-              <button class="btn btn-secondary" onclick="document.getElementById('invExcelInput').click()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 20px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Import Excel</button>
               <button class="btn btn-primary" onclick="openAddProductModal()">+ Add Product</button>
             </div>
           </div>
@@ -45,7 +43,6 @@
             <button class="sub-nav-item" data-source="inventory" onclick="filterInventory('inventory')">Inventory</button>
             <button class="sub-nav-item" data-source="imported" onclick="filterInventory('imported')">Imported</button>
           </nav>
-        <input type="file" id="invExcelInput" accept=".xlsx,.xls" style="display:none;" onchange="inventoryImportExcel(event)">
         <div class="card table-card">
           <table>
             <thead>

@@ -445,6 +445,27 @@ button, input { outline: none; border: none; font-family: inherit; }
 .dashboard-stats .card p { font-size: 28px; font-weight: 700; color: var(--text-dark); }
 .dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 20px; }
 
+/* =========================================
+   Dashboard Charts UI
+   ========================================= */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.chart-span-2 { grid-column: span 2; }
+
+.chart-card .chart-title { color: var(--pc-blue); font-size: 16px; margin-bottom: 4px; }
+.chart-card .chart-sub { display: block; font-size: 12px; color: #8892a6; margin-bottom: 16px; }
+.chart-wrap { position: relative; height: 250px; }
+
+@media (max-width: 1100px) {
+  .charts-grid { grid-template-columns: 1fr; }
+  .chart-span-2 { grid-column: span 1; }
+}
+
 .btn-primary { background-color: var(--pc-orange); color: var(--text-dark); padding: 10px 20px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; transition: opacity 0.2s; }
 .btn-primary:hover { opacity: 0.9; }
 

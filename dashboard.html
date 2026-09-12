@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Admin Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=15" />
+  <link rel="stylesheet" href="css/styles.css?v=16" />
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
@@ -68,6 +68,29 @@
           </article>
         </div>
 
+        <div class="charts-grid">
+          <div class="card chart-card chart-span-2">
+            <h3 class="chart-title">Sales trend</h3>
+            <span class="chart-sub">Daily sales — last 7 days</span>
+            <div class="chart-wrap"><canvas id="salesTrendChart"></canvas></div>
+          </div>
+          <div class="card chart-card">
+            <h3 class="chart-title">Sales by channel</h3>
+            <span class="chart-sub">Online vs walk-in this month</span>
+            <div class="chart-wrap"><canvas id="channelChart"></canvas></div>
+          </div>
+          <div class="card chart-card">
+            <h3 class="chart-title">Order status</h3>
+            <span class="chart-sub">All recorded orders</span>
+            <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+          </div>
+          <div class="card chart-card chart-span-2">
+            <h3 class="chart-title">Low-stock watch</h3>
+            <span class="chart-sub">Products running low or out of stock</span>
+            <div class="chart-wrap"><canvas id="lowStockChart"></canvas></div>
+          </div>
+        </div>
+
         <div class="section-heading" style="margin-top:2rem;">
           <h2>Recent orders</h2>
         </div>
@@ -88,7 +111,8 @@
       </section>
     </main>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=20"></script>
+  <script src="js/script.js?v=21"></script>
 </body>
 </html>

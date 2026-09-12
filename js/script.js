@@ -508,8 +508,125 @@ if (recentOrdersBody) {
     ordersToAcceptMetaEl.innerText = pendingCount + ' pending confirmations';
     lowStockCountEl.innerText = lowStockItems.length;
     lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.map(p => p.name).join(', ') : 'All products well stocked';
-    dailySalesValueEl.innerText = fmtCurrency(dailySales);
+dailySalesValueEl.innerText = fmtCurrency(dailySales);
     monthlySalesValueEl.innerText = fmtCurrency(monthlySales);
+
+    // Dashboard charts
+    if (typeof window.Chart !== 'undefined') {
+      Chart.defaults.font.family = 'Inter, sans-serif';
+      Chart.defaults.font.size = 12;
+      Chart.defaults.color = '#7d8597';
+      const C = { blue: '#315fb3', orange: '#f26f21', green: '#2e9e5b', purple: '#6b7aff', amber: '#f2a20c', red: '#e74c3c', gray: '#c3c8d2' };
+
+      const moneyTicks = (v) => '₱' + (v >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : v);
+      const moneyLabel = (ctx) => ' ' + fmtCurrency(ctx.parsed.y ?? ctx.parsed);
+
+      // 1. Sales trend — last 7 days
+      const salesLabels = [], salesValues = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const iso = d.toISOString().split('T')[0];
+        salesLabels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        salesValues.push(recentOrders.filter(o => o.date === iso).reduce((s, o) => s + o.amount, 0));
+      }
+      new Chart(document.getElementById('salesTrendChart'), {
+        type: 'bar',
+        data: {
+          labels: salesLabels,
+          datasets: [{
+            label: 'Sales',
+            data: salesValues,
+            backgroundColor: salesValues.map((v, i) => (i === salesValues.length - 1 ? C.orange : C.blue + 'd9')),
+            borderRadius: 6,
+            maxBarThickness: 40
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: moneyLabel } } },
+          scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: moneyTicks } } }
+        }
+      });
+
+      // 2. Sales by channel — this month
+      const monthOrders = recentOrders.filter(o => o.date >= monthStart);
+      const channelOnline = monthOrders.filter(o => /online/i.test(o.type)).reduce((s, o) => s + o.amount, 0);
+      const channelWalkin = monthOrders.filter(o => !/online/i.test(o.type)).reduce((s, o) => s + o.amount, 0);
+      const channelHasData = channelOnline + channelWalkin > 0;
+      new Chart(document.getElementById('channelChart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Online', 'Walk-in'],
+          datasets: [{
+            data: channelHasData ? [channelOnline, channelWalkin] : [1],
+            backgroundColor: channelHasData ? [C.blue, C.orange] : [C.gray],
+            borderColor: '#ffffff', borderWidth: 3, hoverOffset: 8
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '68%',
+          plugins: {
+            legend: { display: channelHasData, position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', padding: 16 } },
+            tooltip: { enabled: channelHasData, callbacks: { label: (ctx) => ' ' + ctx.label + ': ' + fmtCurrency(ctx.parsed) } }
+          }
+        }
+      });
+
+      // 3. Order status distribution
+      const statusColors = { pending: C.amber, completed: C.green, shipped: C.blue, delivered: C.purple, cancelled: C.red, declined: C.red };
+      const statusMap = {};
+      recentOrders.forEach(o => {
+        const k = String(o.status || 'unknown').toLowerCase();
+        statusMap[k] = (statusMap[k] || 0) + 1;
+      });
+      const statusKeys = Object.keys(statusMap);
+      const statusHasData = statusKeys.length > 0;
+      new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: {
+          labels: statusHasData ? statusKeys.map(k => k.charAt(0).toUpperCase() + k.slice(1)) : ['No data'],
+          datasets: [{
+            data: statusHasData ? Object.values(statusMap) : [1],
+            backgroundColor: statusHasData ? statusKeys.map(k => statusColors[k] || C.gray) : [C.gray],
+            borderColor: '#ffffff', borderWidth: 3, hoverOffset: 8
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '68%',
+          plugins: {
+            legend: { display: statusHasData, position: 'bottom', labels: { usePointStyle: true, pointStyle: 'circle', padding: 16 } },
+            tooltip: { enabled: statusHasData }
+          }
+        }
+      });
+
+      // 4. Low-stock watch
+      const lowProducts = [...lowStockItems].sort((a, b) => (a.stock || 0) - (b.stock || 0)).slice(0, 8).reverse();
+      if (lowProducts.length) {
+        new Chart(document.getElementById('lowStockChart'), {
+          type: 'bar',
+          data: {
+            labels: lowProducts.map(p => p.name),
+            datasets: [{
+              label: 'Stock',
+              data: lowProducts.map(p => p.stock || 0),
+              backgroundColor: lowProducts.map(p => (p.stock === 0 ? C.red : (p.stock || 0) <= 2 ? C.orange : C.blue + 'cc')),
+              borderRadius: 6,
+              maxBarThickness: 16
+            }]
+          },
+          options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: (ctx) => ' ' + ctx.parsed.x + ' in stock' } }
+            },
+            scales: { x: { beginAtZero: true, grid: { drawBorder: false } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } }
+          }
+        });
+      }
+    }
   })();
 }
 

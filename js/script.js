@@ -115,7 +115,7 @@ function ruleAdjustedPrice(product) {
 function setLazadaSync(msg) {
   const el = document.getElementById('lazadaSyncStatus');
   if (el) { el.textContent = msg; return; }
-  alert(msg);
+  showToast(msg);
 }
 function lazadaErrorMsg(err, data) {
   if (data && (data.message || data.error)) return (data.message || data.error);
@@ -212,6 +212,30 @@ function esc(s) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast-notification' + (type === 'success' ? ' toast-success' : type === 'error' ? ' toast-error' : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+function showConfirm(msg, onConfirm) {
+  let ov = document.getElementById('confirmOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'confirmOverlay';
+    ov.innerHTML = '<div class="modal-box" style="max-width:380px"><div class="modal-header"><h3>Confirm</h3></div><div class="modal-body"><p id="confirmMessage"></p></div><div class="modal-footer"><button class="btn btn-secondary" id="confirmCancelBtn">Cancel</button><button class="btn btn-primary" id="confirmOkBtn">OK</button></div></div>';
+    document.body.appendChild(ov);
+  }
+  document.getElementById('confirmMessage').textContent = msg;
+  ov.style.display = 'flex';
+  document.getElementById('confirmCancelBtn').onclick = () => { ov.style.display = 'none'; };
+  document.getElementById('confirmOkBtn').onclick = () => { ov.style.display = 'none'; onConfirm(); };
+  ov.onclick = (e) => { if (e.target === ov) ov.style.display = 'none'; };
 }
 
 const fmtCurrency = (a) => '₱' + a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -376,7 +400,7 @@ const posGrid = document.querySelector('.pos-grid');
     const key = source + '-' + dataId;
     const ex = cart.find(i => i._key === key);
     const currentQty = ex ? ex.qty : 0;
-    if (currentQty + 1 > stock) { alert(name + ' only has ' + stock + ' unit(s) in stock.'); return; }
+    if (currentQty + 1 > stock) { showToast(name + ' only has ' + stock + ' unit(s) in stock.', 'error'); return; }
     if (ex) ex.qty += 1;
     else cart.push({ _key: key, name, price, qty: 1, stock, source, dataId });
     updateCartUI();
@@ -398,8 +422,8 @@ const posGrid = document.querySelector('.pos-grid');
     subtotalEl.innerText = fmtCurrency(sub);
     totalEl.innerText = fmtCurrency(sub);
     checkoutBtn.innerText = 'Charge ' + fmtCurrency(sub);
-    checkoutBtn.onclick = () => {
-      if (cart.length === 0) { alert('Cart is empty!'); return; }
+checkoutBtn.onclick = () => {
+      if (cart.length === 0) { showToast('Cart is empty!', 'error'); return; }
       openCashModal(sub);
     };
 }
@@ -407,7 +431,7 @@ const posGrid = document.querySelector('.pos-grid');
   window.changeQty = (i, d) => {
     const item = cart[i];
     if (!item) return;
-    if (d > 0 && item.qty + d > (item.stock || 0)) { alert(item.name + ' only has ' + item.stock + ' unit(s) in stock.'); return; }
+    if (d > 0 && item.qty + d > (item.stock || 0)) { showToast(item.name + ' only has ' + item.stock + ' unit(s) in stock.', 'error'); return; }
     item.qty += d;
     if (item.qty <= 0) cart.splice(i, 1);
     updateCartUI();
@@ -428,9 +452,11 @@ const posGrid = document.querySelector('.pos-grid');
         document.getElementById('cashChangeGroup').style.display = 'none';
       }
     };
-    document.getElementById('cashConfirmBtn').onclick = async () => {
+document.getElementById('cashConfirmBtn').onclick = () => {
       const rec = parseFloat(document.getElementById('cashReceived').value) || 0;
-      if (rec < total) { alert('Amount received is less than total.'); return; }
+      if (rec < total) { showToast('Amount received is less than total.', 'error'); return; }
+      showConfirm('Complete payment of ' + fmtCurrency(total) + '?', () => void (async () => {
+      try {
       const inv = await fetchAll('inventory');
       const imp = await fetchAll('imported_products');
       cart.forEach(item => {
@@ -461,12 +487,14 @@ const posGrid = document.querySelector('.pos-grid');
             const i = rec.findIndex(x => x.id === order.id);
             if (i !== -1) { rec[i].id = inserted[0].id; localStorage.setItem('posOrders', JSON.stringify(rec)); }
           }
-        } catch(e) { console.warn('pos order sync failed:', e); }
+} catch(e) { console.warn('pos order sync failed:', e); }
       }
-      alert('Transaction Completed!\nTotal: ' + fmtCurrency(total) + '\nCash: ' + fmtCurrency(rec) + '\nChange: ' + fmtCurrency(rec - total));
+      showToast('Transaction completed! Change: ' + fmtCurrency(rec - total), 'success');
+      } catch(e) { showToast('Transaction failed: ' + (e.message || 'Unknown error'), 'error'); }
       closeCashModal();
       cart = [];
       updateCartUI();
+      })());
     };
   };
 
@@ -728,21 +756,25 @@ const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="
     }).join('');
   }
 
-  window.toggleProduct = async (id) => {
+window.toggleProduct = async (id) => {
     const p = await fetchInv();
     const r = p.find(x => x.id === id);
-    if (r) { r.enabled = !r.enabled; await saveInv(p); renderInv(); }
+    if (r) { r.enabled = !r.enabled; await saveInv(p); renderInv(); showToast(r.enabled ? 'Product enabled.' : 'Product disabled.', 'success'); }
   };
 
   window.deleteProduct = async () => {
     const id = document.getElementById('editProductId').value;
     if (!id) return;
-    if (!confirm('Delete this product permanently?')) return;
-    let products = await fetchInv();
-    products = products.filter(p => p.id !== parseInt(id));
-    await saveInv(products);
-    renderInv();
-    closeProductModal();
+    showConfirm('Delete this product permanently?', () => void (async () => {
+      try {
+        let products = await fetchInv();
+        products = products.filter(p => p.id !== parseInt(id));
+        await saveInv(products);
+        renderInv();
+        closeProductModal();
+        showToast('Product deleted.', 'success');
+      } catch(e) { showToast('Failed to delete: ' + (e.message || 'Unknown error'), 'error'); }
+    })());
   };
 
   window.openAddProductModal = () => {
@@ -770,7 +802,7 @@ const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="
     };
     reader.readAsDataURL(file);
   };
-  window.saveProduct = async () => {
+window.saveProduct = () => {
     const id = document.getElementById('editProductId').value;
     const name = document.getElementById('productName').value.trim();
     const description = document.getElementById('productDescription').value.trim();
@@ -780,18 +812,24 @@ const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="
     const enabled = document.getElementById('productEnabled').value === 'checked';
     const preview = document.getElementById('imagePreview');
     const imgSrc = preview.querySelector('img') ? preview.querySelector('img').src : '';
-    if (!name || isNaN(price) || isNaN(stock) || isNaN(threshold)) { alert('Please fill all fields.'); return; }
-    const products = await fetchInv();
-    if (id) {
-      const p = products.find(x => x.id === parseInt(id));
-      if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.threshold = threshold; p.enabled = enabled; p.category = guessCategory(name); if (imgSrc) p.image = imgSrc; }
-    } else {
-      const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1;
-      products.push({ id: newId, name, description, price, stock, threshold, enabled, image: imgSrc, category: guessCategory(name) });
-    }
-    await saveInv(products);
-    renderInv();
-    closeProductModal();
+    if (!name || isNaN(price) || isNaN(stock) || isNaN(threshold)) { showToast('Please fill all fields.', 'error'); return; }
+    const isEdit = !!id;
+    showConfirm(isEdit ? 'Save changes to "' + name + '"?' : 'Add "' + name + '" to inventory?', () => void (async () => {
+      try {
+        const products = await fetchInv();
+        if (id) {
+          const p = products.find(x => x.id === parseInt(id));
+          if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.threshold = threshold; p.enabled = enabled; p.category = guessCategory(name); if (imgSrc) p.image = imgSrc; }
+        } else {
+          const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1;
+          products.push({ id: newId, name, description, price, stock, threshold, enabled, image: imgSrc, category: guessCategory(name) });
+        }
+        await saveInv(products);
+        renderInv();
+        closeProductModal();
+        showToast(isEdit ? 'Product updated.' : 'Product added.', 'success');
+      } catch(e) { showToast('Failed to save: ' + (e.message || 'Unknown error'), 'error'); }
+    })());
   };
   window.editProduct = async (id) => {
     const products = await fetchInv();
@@ -817,7 +855,7 @@ const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="
   window.inventoryImportExcel = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    if (typeof XLSX === 'undefined') { alert('Excel library failed to load.'); return; }
+    if (typeof XLSX === 'undefined') { showToast('Excel library failed to load.', 'error'); return; }
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
@@ -825,7 +863,7 @@ const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="
         const workbook = XLSX.read(data, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        if (json.length < 2) { alert('Excel file has no data rows.'); return; }
+        if (json.length < 2) { showToast('Excel file has no data rows.', 'error'); return; }
         const hr = json[0].map(h => String(h || '').toLowerCase().trim());
         const ni = hr.findIndex(h => h.includes('product') || h.includes('name') || h.includes('item'));
         const pi = hr.findIndex(h => h.includes('price') || h.includes('amount') || h.includes('cost'));
@@ -849,8 +887,8 @@ const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="
         await upsertAll('imported_products', products);
         renderInv();
         const msg = 'Imported ' + count + ' product' + (count !== 1 ? 's' : '') + '.';
-        alert(skipped ? msg + ' (' + skipped + ' duplicate' + (skipped > 1 ? 's' : '') + ' skipped)' : msg);
-      } catch (err) { alert('Error reading file: ' + err.message); }
+showToast(skipped ? msg + ' (' + skipped + ' duplicate' + (skipped > 1 ? 's' : '') + ' skipped)' : msg, 'success');
+      } catch (err) { showToast('Error reading file: ' + err.message, 'error'); }
     };
     reader.readAsArrayBuffer(file);
     event.target.value = '';
@@ -870,26 +908,32 @@ const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="
     document.getElementById('importProductEnabled').value = p.enabled ? 'checked' : '';
     document.getElementById('importProductModal').style.display = 'flex';
   };
-  window.closeImportProductModal = () => { document.getElementById('importProductModal').style.display = 'none'; };
-  window.saveImportProduct = async () => {
+window.closeImportProductModal = () => { document.getElementById('importProductModal').style.display = 'none'; };
+  window.saveImportProduct = () => {
     const id = document.getElementById('editImportProductId').value;
     const name = document.getElementById('importProductName').value.trim();
     const description = document.getElementById('importProductDescription').value.trim();
     const price = parseFloat(document.getElementById('importProductPrice').value);
     const stock = parseInt(document.getElementById('importProductStock').value);
     const enabled = document.getElementById('importProductEnabled').value === 'checked';
-    if (!name || isNaN(price) || isNaN(stock)) { alert('Please fill all fields.'); return; }
-    const products = await fetchAll('imported_products');
-    if (id) { const p = products.find(x => x.id === parseInt(id));       if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.enabled = enabled; p.category = guessCategory(name); } }
-    else { const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1; products.push({ id: newId, name, description, price, stock, enabled: enabled, threshold: 5, image: '', category: guessCategory(name) }); }
-    await upsertAll('imported_products', products);
-    renderInv();
-    closeImportProductModal();
+    if (!name || isNaN(price) || isNaN(stock)) { showToast('Please fill all fields.', 'error'); return; }
+    const isEdit = !!id;
+    showConfirm(isEdit ? 'Save changes to "' + name + '"?' : 'Add "' + name + '" to inventory?', () => void (async () => {
+      try {
+        const products = await fetchAll('imported_products');
+        if (id) { const p = products.find(x => x.id === parseInt(id));       if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.enabled = enabled; p.category = guessCategory(name); } }
+        else { const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1; products.push({ id: newId, name, description, price, stock, enabled: enabled, threshold: 5, image: '', category: guessCategory(name) }); }
+        await upsertAll('imported_products', products);
+        renderInv();
+        closeImportProductModal();
+        showToast(isEdit ? 'Product updated.' : 'Product added.', 'success');
+      } catch(e) { showToast('Failed to save: ' + (e.message || 'Unknown error'), 'error'); }
+    })());
   };
   window.toggleImportProduct = async (id) => {
     const products = await fetchAll('imported_products');
     const p = products.find(x => x.id === id);
-    if (p) { p.enabled = !p.enabled; await upsertAll('imported_products', products); renderInv(); }
+    if (p) { p.enabled = !p.enabled; await upsertAll('imported_products', products); renderInv(); showToast(p.enabled ? 'Product enabled.' : 'Product disabled.', 'success'); }
   };
 
   renderInv();
@@ -1153,7 +1197,7 @@ function ruleSign(r) { return (r && r.direction === 'subtract') ? '-' : '+'; }
   };
   window.closeRuleModal = () => { document.getElementById('ruleModal').style.display = 'none'; };
 
-  window.saveRule = async () => {
+window.saveRule = () => {
     const id = document.getElementById('editRuleId').value;
     const direction = document.getElementById('ruleDirection').value;
     const field = document.getElementById('ruleField').value;
@@ -1162,11 +1206,17 @@ function ruleSign(r) { return (r && r.direction === 'subtract') ? '-' : '+'; }
     const adjustValue = parseFloat(document.getElementById('ruleAdjustValue').value);
     const adjustType = document.getElementById('ruleAdjustType').value;
     const enabled = true;
-    if (isNaN(value) || isNaN(adjustValue) || adjustValue <= 0) { alert('Please fill all fields.'); return; }
-    const rules = _rulesCache || [];
-    if (id) { const r = rules.find(x => x.id === parseInt(id)); if (r) { r.direction = direction; r.field = field; r.operator = operator; r.value = value; r.adjustValue = adjustValue; r.adjustType = adjustType; r.enabled = enabled; } }
-    else { const nid = rules.length > 0 ? Math.max(...rules.map(x => x.id)) + 1 : 1; rules.push({ id: nid, direction, field, operator, value, adjustValue, adjustType, enabled }); }
-    saveRules(rules); await syncRulesToBackend(); renderRules(); closeRuleModal();
+    if (isNaN(value) || isNaN(adjustValue) || adjustValue <= 0) { showToast('Please fill all fields.', 'error'); return; }
+    const isEdit = !!id;
+    showConfirm(isEdit ? 'Save changes to this price rule?' : 'Create this price automation rule?', () => void (async () => {
+      try {
+        const rules = _rulesCache || [];
+        if (id) { const r = rules.find(x => x.id === parseInt(id)); if (r) { r.direction = direction; r.field = field; r.operator = operator; r.value = value; r.adjustValue = adjustValue; r.adjustType = adjustType; r.enabled = enabled; } }
+        else { const nid = rules.length > 0 ? Math.max(...rules.map(x => x.id)) + 1 : 1; rules.push({ id: nid, direction, field, operator, value, adjustValue, adjustType, enabled }); }
+        saveRules(rules); await syncRulesToBackend(); renderRules(); closeRuleModal();
+        showToast(isEdit ? 'Rule updated.' : 'Rule created.', 'success');
+      } catch(e) { showToast('Failed to save rule: ' + (e.message || 'Unknown error'), 'error'); }
+    })());
   };
 
   window.editRule = (id) => {
@@ -1182,15 +1232,20 @@ function ruleSign(r) { return (r && r.direction === 'subtract') ? '-' : '+'; }
     document.getElementById('ruleModal').style.display = 'flex';
   };
 
-  window.toggleRule = async (id) => {
+window.toggleRule = async (id) => {
     const rules = _rulesCache || []; const r = rules.find(x => x.id === id);
-    if (r) { r.enabled = !r.enabled; saveRules(rules); await syncRulesToBackend(); renderRules(); }
+    if (r) { r.enabled = !r.enabled; saveRules(rules); await syncRulesToBackend(); renderRules(); showToast(r.enabled ? 'Rule enabled.' : 'Rule disabled.', 'success'); }
   };
 
-  window.deleteRule = async (id) => {
-    let rules = _rulesCache || [];
-    rules = rules.filter(x => x.id !== id);
-    saveRules(rules); await syncRulesToBackend(); renderRules();
+  window.deleteRule = (id) => {
+    showConfirm('Delete this rule permanently?', () => void (async () => {
+      try {
+        let rules = _rulesCache || [];
+        rules = rules.filter(x => x.id !== id);
+        saveRules(rules); await syncRulesToBackend(); renderRules();
+        showToast('Rule deleted.', 'success');
+      } catch(e) { showToast('Failed to delete rule: ' + (e.message || 'Unknown error'), 'error'); }
+    })());
   };
 }
 

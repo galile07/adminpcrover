@@ -4,7 +4,7 @@
   --pc-blue: #315fb3;
   --pc-orange: #f26f21;
   --text-dark: #000000;
-  --bg-white: #f6f7f9;
+  --bg-white: #eef0f4;
 }
 
 * {
@@ -15,7 +15,7 @@
 }
 
 body {
-  background-color: #eceef1;
+  background-color: #e0e3e8;
   color: #333;
 }
 
@@ -170,7 +170,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border-bottom: 1px solid #eaeaea;
+  border-bottom: 1px solid #d8dce3;
   flex-shrink: 0;
 }
 
@@ -257,7 +257,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   transition: background 0.2s;
 }
 
-.btn-secondary:hover { background-color: #f5f5f5; }
+.btn-secondary:hover { background-color: #e6e9ef; }
 
 /* =========================================
    Order Cards
@@ -270,7 +270,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .order-card {
   background: var(--bg-white);
-  border: 1px solid #eaeaea;
+  border: 1px solid #d8dce3;
   border-radius: 10px;
   padding: 18px 22px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -353,7 +353,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #eaeaea;
+  border-bottom: 1px solid #d8dce3;
 }
 
 .modal-header h3 {
@@ -406,7 +406,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .modal-items-table td {
   padding: 10px 12px;
-  border-bottom: 1px solid #eaeaea;
+  border-bottom: 1px solid #d8dce3;
 }
 
 .modal-items-table tfoot td {
@@ -421,7 +421,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   align-items: center;
   gap: 12px;
   padding: 16px 24px 20px;
-  border-top: 1px solid #eaeaea;
+  border-top: 1px solid #d8dce3;
 }
 
 .btn-decline {
@@ -448,7 +448,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .card { 
   background: var(--bg-white); 
-  border: 1px solid #eaeaea; 
+  border: 1px solid #d8dce3; 
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03); 
   border-radius: 10px; 
   padding: 24px; 
@@ -485,7 +485,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .table-card table { width: 100%; border-collapse: collapse; text-align: left; }
 .table-card th { background-color: var(--pc-blue); color: white; padding: 14px 16px; font-size: 14px; }
-.table-card td { padding: 14px 16px; border-bottom: 1px solid #eaeaea; font-size: 14px; }
+.table-card td { padding: 14px 16px; border-bottom: 1px solid #d8dce3; font-size: 14px; }
 
 .status-pill { padding: 6px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; }
 .status-pill.active { background-color: #d4edda; color: #155724; }
@@ -532,7 +532,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 .pos-category-btn {
   padding: 8px 16px;
   background: var(--bg-white);
-  border: 1px solid #eaeaea;
+  border: 1px solid #d8dce3;
   border-radius: 20px;
   font-size: 13px;
   font-weight: 600;
@@ -551,7 +551,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   align-items: center;
   gap: 10px;
   background: var(--bg-white);
-  border: 1px solid #eaeaea;
+  border: 1px solid #d8dce3;
   border-radius: 999px;
   padding: 10px 16px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -579,11 +579,13 @@ button, input { outline: none; border: none; font-family: inherit; }
   gap: 15px;
   overflow-y: auto;
   padding-right: 5px;
+  min-height: 0;
+  flex: 1;
 }
 
 .pos-item-card {
   background: var(--bg-white);
-  border: 1px solid #eaeaea;
+  border: 1px solid #d8dce3;
   border-radius: 10px;
   padding: 15px;
   text-align: center;
@@ -604,7 +606,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 .pos-item-img {
   width: 100%;
   height: 60px;
-  background-color: #f5f5f5;
+  background-color: #e6e9ef;
   border-radius: 6px;
   margin-bottom: 10px;
   display: flex;
@@ -653,7 +655,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   flex: 1;
   min-width: 320px;
   background: var(--bg-white);
-  border: 1px solid #eaeaea;
+  border: 1px solid #d8dce3;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -663,8 +665,8 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .pos-cart-header {
   padding: 20px;
-  border-bottom: 1px solid #eaeaea;
-  background: #f2f3f6;
+  border-bottom: 1px solid #d8dce3;
+  background: #e7eaf0;
 }
 
 .pos-cart-header h3 {
@@ -675,6 +677,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 .pos-cart-list {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -685,7 +688,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px dashed #eaeaea;
+  border-bottom: 1px dashed #d8dce3;
   padding-bottom: 15px;
 }
 
@@ -714,8 +717,8 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .pos-cart-summary {
   padding: 20px;
-  background: #f2f3f6;
-  border-top: 1px solid #eaeaea;
+  background: #e7eaf0;
+  border-top: 1px solid #d8dce3;
 }
 
 .pos-summary-row {
@@ -731,7 +734,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   justify-content: space-between;
   margin-top: 15px;
   padding-top: 15px;
-  border-top: 2px solid #eaeaea;
+  border-top: 2px solid #d8dce3;
   font-size: 20px;
   font-weight: 800;
   color: var(--text-dark);
@@ -823,7 +826,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   margin-top: 10px;
   width: 100px;
   height: 100px;
-  border: 1px solid #eaeaea;
+  border: 1px solid #d8dce3;
   border-radius: 8px;
   overflow: hidden;
   display: none;
@@ -862,7 +865,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   left: 3px;
   width: 18px;
   height: 18px;
-  background: white;
+  background: #f5f6f8;
   border-radius: 50%;
   transition: transform 0.2s;
 }
@@ -886,7 +889,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   height: 40px;
   border-radius: 6px;
   object-fit: cover;
-  border: 1px solid #eaeaea;
+  border: 1px solid #d8dce3;
 }
 
 .btn-toggle {
@@ -936,7 +939,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 #excelTableContainer table td,
 #excelTableContainer table th {
   padding: 8px 12px;
-  border: 1px solid #eaeaea;
+  border: 1px solid #d8dce3;
 }
 
 /* =========================================

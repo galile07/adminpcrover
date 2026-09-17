@@ -362,7 +362,7 @@ const posGrid = document.querySelector('.pos-grid');
             '<div class="pos-item-price' + (c.adjusted ? ' rule' : '') + '" title="' + (c.adjusted ? 'Price automation active' : '') + '">' + fmtCurrency(c.price) + '</div>' +
           '</div>'
         ).join('')
-      : '<div style="text-align:center;color:#999;padding:50px 0;">No products available.</div>';
+      : '<div style="text-align:center;color:#999;padding:50px 0;">There\'s nothing here.</div>';
     if (searchInput && searchInput.value.trim()) filterPOS();
   }
 
@@ -568,7 +568,7 @@ const invProducts = await fetchAll('inventory');
 
     recentOrdersBody.innerHTML = recentOrders.length
       ? recentOrders.slice(0, 20).map(o => '<tr><td>' + esc(o.date) + '</td><td>#' + esc(o.id || '') + '</td><td>' + esc(o.customer || '-') + '</td><td>' + esc(o.type || '') + ' · ' + esc(o.status || '') + '</td><td>' + fmtCurrency(o.amount) + '</td></tr>').join('')
-      : '<tr><td colspan="5" style="text-align:center;color:#999;">No orders yet</td></tr>';
+      : '<tr><td colspan="5" style="text-align:center;color:#999;">There\'s nothing here.</td></tr>';
 
     recentOrdersCountEl.innerText = recentOrders.length;
     ordersToAcceptCountEl.innerText = pendingCount;
@@ -731,7 +731,7 @@ if (inventoryTableBody) {
     let all = [...inv.map(p => ({ ...p, _src: 'inventory' })), ...imp.map(p => ({ ...p, _src: 'imported' }))];
     if (_invSource !== 'all') all = all.filter(p => p._src === _invSource);
 
-    inventoryTableBody.innerHTML = all.map(p => {
+    inventoryTableBody.innerHTML = all.length ? all.map(p => {
       let toggleHtml;
       if (p._src === 'imported') {
         toggleHtml = '<button class="btn-toggle ' + (p.enabled ? 'active' : 'inactive') + '" onclick="toggleImportProduct(' + p.id + ')">' + (p.enabled ? 'Active' : 'Disabled') + '</button>';
@@ -751,9 +751,9 @@ const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="
             ? '<button class="btn-icon" onclick="editImportProduct(' + p.id + ')" title="Edit">Edit</button>'
             : '<button class="btn-icon" onclick="editProduct(' + p.id + ')" title="Edit">Edit</button>') +
           toggleHtml +
-        '</td>' +
+'</td>' +
       '</tr>';
-    }).join('');
+    }).join('') : '<tr><td colspan="7" style="text-align:center;color:#999;padding:30px 0;">There\'s nothing here.</td></tr>';
   }
 
 window.toggleProduct = async (id) => {
@@ -1094,7 +1094,7 @@ function renderOrders(filterStatus) {
     const filtered = onlineOrders.filter(o => o.status === filterStatus).sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
     ordersContainer.innerHTML = filtered.length
       ? filtered.map(order => '<div class="order-card"><div class="order-card-top"><div><span class="order-id">#' + esc(order.code || order.id) + '</span><span class="order-time">' + esc(order.date) + ' ' + esc(order.time) + '</span></div><button class="btn-view" onclick="viewOrder(\'' + esc(order.id) + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + esc(order.customer) + '</div><div class="order-address">' + esc(order.address) + '</div></div></div>').join('')
-      : '<div style="text-align:center;color:#999;padding:60px 0;">No orders in this status.</div>';
+      : '<div style="text-align:center;color:#999;padding:60px 0;">There\'s nothing here.</div>';
   }
 
   window.viewOrder = (id) => {
@@ -1175,13 +1175,13 @@ function ruleSign(r) { return (r && r.direction === 'subtract') ? '-' : '+'; }
 
   function renderRules() {
     const rules = _rulesCache || [];
-    rulesTableBody.innerHTML = rules.map((r, i) => {
+    rulesTableBody.innerHTML = rules.length ? rules.map((r, i) => {
       const s = r.enabled ? '<span class="status-pill active">Live</span>' : '<span class="status-pill paused">Disabled</span>';
       const sign = ruleSign(r);
       const adj = r.adjustType === 'percent' ? sign + ' ' + esc(r.adjustValue) + '%' : sign + ' ₱' + esc(r.adjustValue);
       const trigger = esc((fieldLabels[r.field] || r.field) + ' ' + (opLabels[r.operator] || r.operator) + ' ' + r.value);
       return '<tr><td>' + (i + 1) + '</td><td><strong>Rule #' + (i + 1) + '</strong></td><td>' + trigger + '</td><td>' + adj + '</td><td>' + s + '</td><td style="text-align:center;white-space:nowrap;"><button class="btn-icon" onclick="editRule(' + r.id + ')" title="Edit">Edit</button><button class="btn-icon" onclick="toggleRule(' + r.id + ')" title="Toggle">' + (r.enabled ? 'Disable' : 'Enable') + '</button><button class="btn-icon danger" onclick="deleteRule(' + r.id + ')" title="Delete">X</button></td></tr>';
-    }).join('');
+    }).join('') : '<tr><td colspan="6" style="text-align:center;color:#999;padding:30px 0;">There\'s nothing here.</td></tr>';
   }
 
   window.openAddRuleModal = () => {

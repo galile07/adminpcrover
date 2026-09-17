@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER POS</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=15" />
+  <link rel="stylesheet" href="css/styles.css?v=17" />
 </head>
 <body>
   <div class="layout-shell">
@@ -37,17 +37,18 @@
           <div class="pos-products-section">
             <div class="pos-search-bar">
               <input type="text" id="posSearchInput" placeholder="Search products..." />
-              <span class="pos-search-icon">??</span>
+              <span class="pos-search-icon">&#x1F50D;</span>
             </div>
+            <div class="pos-categories" id="posCategories"></div>
             <div class="pos-grid"></div>
           </div>
           <div class="pos-cart-section">
-            <div class="pos-cart-header">Current Order</div>
+            <div class="pos-cart-header"><h3>Current Order</h3></div>
             <div class="pos-cart-list"></div>
             <div class="pos-cart-summary">
-              <div class="pos-summary-row"><span>Subtotal</span><span>?0.00</span></div>
-              <div class="pos-summary-total"><span>Total</span><span>?0.00</span></div>
-              <button class="btn-primary btn-checkout">Pay Out ?0.00</button>
+              <div class="pos-summary-row"><span>Subtotal</span><span>₱0.00</span></div>
+              <div class="pos-summary-total"><span>Total</span><span>₱0.00</span></div>
+              <button class="btn-primary btn-checkout">Pay Out ₱0.00</button>
             </div>
           </div>
         </div>
@@ -68,7 +69,7 @@
           <p id="cashTotalDisplay" style="font-size:24px;font-weight:700;color:var(--pc-blue);margin:4px 0 16px;"></p>
         </div>
         <div class="form-group">
-          <label>Amount Received (?)</label>
+          <label>Amount Received (₱)</label>
           <input type="number" id="cashReceived" class="form-input" placeholder="Enter cash amount" min="0" step="0.01">
         </div>
         <div class="form-group" id="cashChangeGroup" style="display:none;">
@@ -83,6 +84,6 @@
     </div>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=20"></script>
+  <script src="js/script.js?v=22"></script>
 </body>
 </html>

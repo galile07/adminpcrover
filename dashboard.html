@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Admin Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=16" />
+  <link rel="stylesheet" href="css/styles.css?v=17" />
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
@@ -53,12 +53,12 @@
           </article>
           <article class="card">
             <strong>Daily sales</strong>
-            <p id="dailySalesValue">?0.00</p>
+            <p id="dailySalesValue">₱0.00</p>
             <span class="card-meta">Sales captured today</span>
           </article>
           <article class="card">
             <strong>Monthly sales</strong>
-            <p id="monthlySalesValue">?0.00</p>
+            <p id="monthlySalesValue">₱0.00</p>
             <span class="card-meta">Sales this month</span>
           </article>
           <article class="card">
@@ -88,6 +88,7 @@
             <h3 class="chart-title">Low-stock watch</h3>
             <span class="chart-sub">Products running low or out of stock</span>
             <div class="chart-wrap"><canvas id="lowStockChart"></canvas></div>
+            <p id="lowStockEmpty" class="chart-sub" style="display:none;text-align:center;padding:80px 0;">All products are well stocked.</p>
           </div>
         </div>
 
@@ -113,6 +114,6 @@
   </div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=21"></script>
+  <script src="js/script.js?v=22"></script>
 </body>
 </html>

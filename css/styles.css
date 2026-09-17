@@ -245,6 +245,20 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .header .btn-secondary:hover { background-color: rgba(255, 255, 255, 0.1); }
 
+.btn-secondary {
+  background: var(--bg-white);
+  color: #555;
+  border: 1px solid #ccc;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-secondary:hover { background-color: #f5f5f5; }
+
 /* =========================================
    Order Cards
    ========================================= */
@@ -923,4 +937,48 @@ button, input { outline: none; border: none; font-family: inherit; }
 #excelTableContainer table th {
   padding: 8px 12px;
   border: 1px solid #eaeaea;
+}
+
+/* =========================================
+   Responsive tweaks
+   ========================================= */
+@media (max-width: 900px) {
+  .login-aside {
+    width: 100%;
+    height: auto;
+    max-width: 440px;
+    flex-direction: column;
+  }
+  .login-brand-panel { padding: 30px 20px; }
+}
+
+@media (max-width: 800px) {
+  .layout-shell {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+  .sidebar { width: 100%; }
+  .nav-links {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding-top: 10px;
+    gap: 6px;
+  }
+  .header {
+    padding: 12px 16px;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .sub-nav { top: 0; overflow-x: auto; padding: 0 10px; }
+  .page-content { padding: 20px 16px; }
+  .pos-layout {
+    flex-direction: column;
+    height: auto;
+  }
+  .pos-cart-section { min-width: 0; }
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .pos-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }

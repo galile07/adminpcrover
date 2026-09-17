@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Price Automation</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=15" />
+  <link rel="stylesheet" href="css/styles.css?v=17" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="page-dashboard">
@@ -90,7 +90,10 @@
                   <label>Price Adjustment</label>
                   <div class="form-row">
                     <div class="form-group" style="flex:0.4;">
-                      <span style="display:inline-block;width:100%;padding:10px;text-align:center;background:#eef2f7;border:1px solid #e3e8ef;border-radius:6px;font-weight:700;color:var(--pc-blue);">+</span>
+                      <select id="ruleDirection" class="form-input">
+                        <option value="add">+</option>
+                        <option value="subtract">-</option>
+                      </select>
                     </div>
                     <div class="form-group">
                       <input type="number" id="ruleAdjustValue" class="form-input" placeholder="Amount" required min="0">
@@ -98,11 +101,11 @@
                     <div class="form-group" style="flex:0.6;">
                       <select id="ruleAdjustType" class="form-input">
                         <option value="percent">%</option>
-                        <option value="none">Fixed ?</option>
+                        <option value="none">Fixed ₱</option>
                       </select>
                     </div>
                   </div>
-                  <small style="color:#999;font-size:12px;">% = percentage of current price. Fixed ? = flat amount.</small>
+                  <small style="color:#999;font-size:12px;">% = percentage of current price. Fixed ₱ = flat amount.</small>
                 </div>
             </form>
           </div>
@@ -116,6 +119,6 @@
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=20"></script>
+  <script src="js/script.js?v=22"></script>
 </body>
 </html>

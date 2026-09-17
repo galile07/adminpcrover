@@ -205,6 +205,15 @@ window.syncLazada = async () => {
 // ==========================================
 // HELPERS: currency / date
 // ==========================================
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const fmtCurrency = (a) => '₱' + a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function getTodayStr() { return new Date().toISOString().split('T')[0]; }
@@ -307,31 +316,54 @@ if (cartList) {
   const totalEl = document.querySelector('.pos-summary-total span:nth-child(2)');
   const checkoutBtn = document.querySelector('.btn-checkout');
   const searchInput = document.getElementById('posSearchInput');
-  const posGrid = document.querySelector('.pos-grid');
+const posGrid = document.querySelector('.pos-grid');
 
   let _pendingTotal = 0;
+  let _posCategory = 'all';
+  const POS_CAT_LABELS = { computers: 'Computers', accessories: 'Accessories', security: 'Security', preowned: 'Preowned', other: 'Other' };
 
   async function loadAndRenderPOS() {
     await getRules();
     const inv = await fetchAll('inventory');
     const imp = await fetchAll('imported_products');
-    const invCards = inv.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), adjusted: isRuleAdjusted(p), image: productImage(p, 400), source: 'inventory', dataId: p.id }));
-    const impCards = imp.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), adjusted: isRuleAdjusted(p), image: productImage(p, 400), source: 'imported', dataId: p.id }));
+    const invCards = inv.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), adjusted: isRuleAdjusted(p), image: productImage(p, 400), category: p.category || guessCategory(p.name), stock: p.stock || 0, source: 'inventory', dataId: p.id }));
+    const impCards = imp.filter(p => p.enabled && (p.stock || 0) > 0).map(p => ({ name: p.name, price: applyRulesToProduct(p), adjusted: isRuleAdjusted(p), image: productImage(p, 400), category: p.category || guessCategory(p.name), stock: p.stock || 0, source: 'imported', dataId: p.id }));
     const all = [...invCards, ...impCards];
-    posGrid.innerHTML = all.map(c =>
-      '<div class="pos-item-card" data-name="' + c.name + '" data-price="' + c.price + '" data-source="' + c.source + '" data-id="' + c.dataId + '">' +
-        '<div class="pos-item-img"><img src="' + c.image + '" alt="' + c.name + '" loading="lazy"></div>' +
-        '<div class="pos-item-name">' + c.name + '</div>' +
-        '<div class="pos-item-price' + (c.adjusted ? ' rule' : '') + '" title="' + (c.adjusted ? 'Price automation active' : '') + '">₱' + c.price.toLocaleString() + '</div>' +
-      '</div>'
-    ).join('');
+    renderPosCategories(all);
+    posGrid.innerHTML = all.length
+      ? all.map(c =>
+          '<div class="pos-item-card" data-name="' + esc(c.name) + '" data-price="' + c.price + '" data-source="' + c.source + '" data-id="' + c.dataId + '" data-category="' + esc(c.category) + '" data-stock="' + c.stock + '">' +
+            '<div class="pos-item-img"><img src="' + c.image + '" alt="' + esc(c.name) + '" loading="lazy"></div>' +
+            '<div class="pos-item-name">' + esc(c.name) + '</div>' +
+            '<div class="pos-item-price' + (c.adjusted ? ' rule' : '') + '" title="' + (c.adjusted ? 'Price automation active' : '') + '">' + fmtCurrency(c.price) + '</div>' +
+          '</div>'
+        ).join('')
+      : '<div style="text-align:center;color:#999;padding:50px 0;">No products available.</div>';
     if (searchInput && searchInput.value.trim()) filterPOS();
   }
+
+  function renderPosCategories(products) {
+    const catEl = document.getElementById('posCategories');
+    if (!catEl) return;
+    const cats = [];
+    products.forEach(p => { if (cats.indexOf(p.category) === -1) cats.push(p.category); });
+    const label = c => POS_CAT_LABELS[c] || (c.charAt(0).toUpperCase() + c.slice(1));
+    catEl.innerHTML = '<button class="pos-category-btn active" data-cat="all" onclick="setPosCategory(\'all\')">All</button>' +
+      cats.map(c => '<button class="pos-category-btn" data-cat="' + esc(c) + '" onclick="setPosCategory(\'' + esc(c) + '\')">' + esc(label(c)) + '</button>').join('');
+  }
+
+  window.setPosCategory = (cat) => {
+    _posCategory = cat;
+    document.querySelectorAll('.pos-category-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+    filterPOS();
+  };
 
   function filterPOS() {
     const t = searchInput.value.trim().toLowerCase();
     document.querySelectorAll('.pos-item-card').forEach(c => {
-      c.style.display = !t || c.dataset.name.toLowerCase().includes(t) ? '' : 'none';
+      const matchCat = _posCategory === 'all' || c.dataset.category === _posCategory;
+      const matchText = !t || c.dataset.name.toLowerCase().includes(t);
+      c.style.display = matchCat && matchText ? '' : 'none';
     });
   }
 
@@ -340,10 +372,13 @@ if (cartList) {
     if (!card || card.style.display === 'none') return;
     const name = card.dataset.name, price = parseFloat(card.dataset.price);
     const source = card.dataset.source || 'inventory', dataId = parseInt(card.dataset.id);
+    const stock = parseInt(card.dataset.stock) || 0;
     const key = source + '-' + dataId;
     const ex = cart.find(i => i._key === key);
+    const currentQty = ex ? ex.qty : 0;
+    if (currentQty + 1 > stock) { alert(name + ' only has ' + stock + ' unit(s) in stock.'); return; }
     if (ex) ex.qty += 1;
-    else cart.push({ _key: key, name, price, qty: 1, source, dataId });
+    else cart.push({ _key: key, name, price, qty: 1, stock, source, dataId });
     updateCartUI();
   });
 
@@ -356,7 +391,7 @@ if (cartList) {
       sub += item.price * item.qty;
       const d = document.createElement('div');
       d.className = 'pos-cart-item';
-      d.innerHTML = '<div class="pos-cart-item-details"><span class="pos-cart-item-name">' + item.name + '</span><span class="pos-cart-item-price">' + fmtCurrency(item.price) + '</span></div><div class="pos-cart-qty"><button class="pos-qty-btn" onclick="changeQty(' + i + ',-1)">-</button><span>' + item.qty + '</span><button class="pos-qty-btn" onclick="changeQty(' + i + ',1)">+</button></div>';
+      d.innerHTML = '<div class="pos-cart-item-details"><span class="pos-cart-item-name">' + esc(item.name) + '</span><span class="pos-cart-item-price">' + fmtCurrency(item.price) + '</span></div><div class="pos-cart-qty"><button class="pos-qty-btn" onclick="changeQty(' + i + ',-1)">-</button><span>' + item.qty + '</span><button class="pos-qty-btn" onclick="changeQty(' + i + ',1)">+</button></div>';
       cartList.appendChild(d);
     });
     _pendingTotal = sub;
@@ -367,11 +402,14 @@ if (cartList) {
       if (cart.length === 0) { alert('Cart is empty!'); return; }
       openCashModal(sub);
     };
-  }
+}
 
   window.changeQty = (i, d) => {
-    cart[i].qty += d;
-    if (cart[i].qty <= 0) cart.splice(i, 1);
+    const item = cart[i];
+    if (!item) return;
+    if (d > 0 && item.qty + d > (item.stock || 0)) { alert(item.name + ' only has ' + item.stock + ' unit(s) in stock.'); return; }
+    item.qty += d;
+    if (item.qty <= 0) cart.splice(i, 1);
     updateCartUI();
   };
 
@@ -500,15 +538,15 @@ if (recentOrdersBody) {
     const monthlySales = monthOrders.reduce((s, o) => s + o.amount, 0);
 
     recentOrdersBody.innerHTML = recentOrders.length
-      ? recentOrders.slice(0, 20).map(o => '<tr><td>' + o.date + '</td><td>#' + (o.id || '') + '</td><td>' + (o.customer || '-') + '</td><td>' + (o.type || '') + ' · ' + (o.status || '') + '</td><td>' + fmtCurrency(o.amount) + '</td></tr>').join('')
+      ? recentOrders.slice(0, 20).map(o => '<tr><td>' + esc(o.date) + '</td><td>#' + esc(o.id || '') + '</td><td>' + esc(o.customer || '-') + '</td><td>' + esc(o.type || '') + ' · ' + esc(o.status || '') + '</td><td>' + fmtCurrency(o.amount) + '</td></tr>').join('')
       : '<tr><td colspan="5" style="text-align:center;color:#999;">No orders yet</td></tr>';
 
     recentOrdersCountEl.innerText = recentOrders.length;
     ordersToAcceptCountEl.innerText = pendingCount;
     ordersToAcceptMetaEl.innerText = pendingCount + ' pending confirmations';
     lowStockCountEl.innerText = lowStockItems.length;
-    lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.map(p => p.name).join(', ') : 'All products well stocked';
-dailySalesValueEl.innerText = fmtCurrency(dailySales);
+lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.map(p => p.name).join(', ') : 'All products well stocked';
+    dailySalesValueEl.innerText = fmtCurrency(dailySales);
     monthlySalesValueEl.innerText = fmtCurrency(monthlySales);
 
     // Dashboard charts
@@ -625,6 +663,9 @@ dailySalesValueEl.innerText = fmtCurrency(dailySales);
             scales: { x: { beginAtZero: true, grid: { drawBorder: false } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } }
           }
         });
+      } else {
+        const emptyEl = document.getElementById('lowStockEmpty');
+        if (emptyEl) emptyEl.style.display = 'block';
       }
     }
   })();
@@ -668,11 +709,11 @@ if (inventoryTableBody) {
       } else {
         toggleHtml = '<button class="btn-toggle ' + (p.enabled ? 'active' : 'inactive') + '" onclick="toggleProduct(' + p.id + ')">' + (p.enabled ? 'Active' : 'Disabled') + '</button>';
       }
-      const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="' + p.name + '" loading="lazy">';
+const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="' + esc(p.name) + '" loading="lazy">';
       return '<tr>' +
         '<td>' + imgHtml + '</td>' +
-        '<td><strong>' + p.name + '</strong>' + (p._src === 'imported' ? ' <span style="font-size:11px;color:#999;">(imported)</span>' : '') + '</td>' +
-        '<td>' + (p.category || guessCategory(p.name)) + '</td>' +
+        '<td><strong>' + esc(p.name) + '</strong>' + (p._src === 'imported' ? ' <span style="font-size:11px;color:#999;">(imported)</span>' : '') + '</td>' +
+        '<td>' + esc(p.category || guessCategory(p.name)) + '</td>' +
         '<td>' + (isRuleAdjusted(p) ? '<span class="price-rule" title="Price automation is active for this product">' + fmt(ruleAdjustedPrice(p)) + '</span><div class="price-base">' + fmt(p.price) + '</div>' : fmt(p.price)) + '</td>' +
         '<td>' + p.stock + '</td>' +
         '<td>' + invStatusPill(p) + '</td>' +
@@ -1004,17 +1045,19 @@ if (ordersContainer && filterTabs.length > 0) {
     renderOrders('pending');
   })();
 
-  function renderOrders(filterStatus) {
+function renderOrders(filterStatus) {
     const filtered = onlineOrders.filter(o => o.status === filterStatus).sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
-    ordersContainer.innerHTML = filtered.map(order => '<div class="order-card"><div class="order-card-top"><div><span class="order-id">#' + (order.code || order.id) + '</span><span class="order-time">' + order.date + ' ' + order.time + '</span></div><button class="btn-view" onclick="viewOrder(\'' + order.id + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + order.customer + '</div><div class="order-address">' + order.address + '</div></div></div>').join('');
+    ordersContainer.innerHTML = filtered.length
+      ? filtered.map(order => '<div class="order-card"><div class="order-card-top"><div><span class="order-id">#' + esc(order.code || order.id) + '</span><span class="order-time">' + esc(order.date) + ' ' + esc(order.time) + '</span></div><button class="btn-view" onclick="viewOrder(\'' + esc(order.id) + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + esc(order.customer) + '</div><div class="order-address">' + esc(order.address) + '</div></div></div>').join('')
+      : '<div style="text-align:center;color:#999;padding:60px 0;">No orders in this status.</div>';
   }
 
   window.viewOrder = (id) => {
     const order = onlineOrders.find(o => o.id === id);
     if (!order) return;
     const modal = document.getElementById('orderModal'), body = document.getElementById('modalBody'), footer = document.getElementById('modalFooter');
-    const itemsHtml = order.items.map(item => '<tr><td>' + item.name + '</td><td>' + item.qty + '</td><td>' + fmtCurrency(item.price) + '</td><td>' + fmtCurrency(item.qty * item.price) + '</td></tr>').join('');
-    body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + (order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + order.date + ' ' + order.time + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + order.customer + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + order.address + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + order.phone + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + order.email + '</span></div><h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
+const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><td>' + item.qty + '</td><td>' + fmtCurrency(item.price) + '</td><td>' + fmtCurrency(item.qty * item.price) + '</td></tr>').join('');
+    body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + esc(order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + esc(order.date) + ' ' + esc(order.time) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + esc(order.customer) + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + esc(order.address) + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + esc(order.phone) + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + esc(order.email) + '</span></div><h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
     if (order.status === 'pending') footer.innerHTML = '<button class="btn btn-decline" onclick="declineOrder(\'' + order.id + '\')">Decline</button><button class="btn btn-primary" onclick="acceptOrder(\'' + order.id + '\')">Accept</button>';
     else if (order.status === 'shipped') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
     else if (order.status === 'delivered') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
@@ -1083,15 +1126,16 @@ if (rulesTableBody) {
     renderRules();
   })();
 
-  function ruleSign() { return '+'; }
+function ruleSign(r) { return (r && r.direction === 'subtract') ? '-' : '+'; }
 
   function renderRules() {
     const rules = _rulesCache || [];
     rulesTableBody.innerHTML = rules.map((r, i) => {
       const s = r.enabled ? '<span class="status-pill active">Live</span>' : '<span class="status-pill paused">Disabled</span>';
       const sign = ruleSign(r);
-      const adj = r.adjustType === 'percent' ? sign + ' ' + r.adjustValue + '%' : sign + ' ₱' + r.adjustValue;
-      return '<tr><td>' + (i + 1) + '</td><td><strong>Rule #' + (i + 1) + '</strong></td><td>' + fieldLabels[r.field] + ' ' + opLabels[r.operator] + ' ' + r.value + '</td><td>' + adj + '</td><td>' + s + '</td><td style="text-align:center;white-space:nowrap;"><button class="btn-icon" onclick="editRule(' + r.id + ')" title="Edit">Edit</button><button class="btn-icon" onclick="toggleRule(' + r.id + ')" title="Toggle">' + (r.enabled ? 'Active' : 'On') + '</button><button class="btn-icon danger" onclick="deleteRule(' + r.id + ')" title="Delete">X</button></td></tr>';
+      const adj = r.adjustType === 'percent' ? sign + ' ' + esc(r.adjustValue) + '%' : sign + ' ₱' + esc(r.adjustValue);
+      const trigger = esc((fieldLabels[r.field] || r.field) + ' ' + (opLabels[r.operator] || r.operator) + ' ' + r.value);
+      return '<tr><td>' + (i + 1) + '</td><td><strong>Rule #' + (i + 1) + '</strong></td><td>' + trigger + '</td><td>' + adj + '</td><td>' + s + '</td><td style="text-align:center;white-space:nowrap;"><button class="btn-icon" onclick="editRule(' + r.id + ')" title="Edit">Edit</button><button class="btn-icon" onclick="toggleRule(' + r.id + ')" title="Toggle">' + (r.enabled ? 'Disable' : 'Enable') + '</button><button class="btn-icon danger" onclick="deleteRule(' + r.id + ')" title="Delete">X</button></td></tr>';
     }).join('');
   }
 
@@ -1103,13 +1147,14 @@ if (rulesTableBody) {
     document.getElementById('ruleValue').value = '';
     document.getElementById('ruleAdjustValue').value = '';
     document.getElementById('ruleAdjustType').value = 'percent';
+    document.getElementById('ruleDirection').value = 'add';
     document.getElementById('ruleModal').style.display = 'flex';
   };
   window.closeRuleModal = () => { document.getElementById('ruleModal').style.display = 'none'; };
 
   window.saveRule = async () => {
     const id = document.getElementById('editRuleId').value;
-    const direction = 'add';
+    const direction = document.getElementById('ruleDirection').value;
     const field = document.getElementById('ruleField').value;
     const operator = document.getElementById('ruleOperator').value;
     const value = parseInt(document.getElementById('ruleValue').value);
@@ -1132,6 +1177,7 @@ if (rulesTableBody) {
     document.getElementById('ruleValue').value = r.value;
     document.getElementById('ruleAdjustValue').value = r.adjustValue;
     document.getElementById('ruleAdjustType').value = r.adjustType;
+    document.getElementById('ruleDirection').value = r.direction || 'add';
     document.getElementById('ruleModal').style.display = 'flex';
   };
 

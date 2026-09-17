@@ -546,7 +546,7 @@ const invProducts = await fetchAll('inventory');
     ordersToAcceptCountEl.innerText = pendingCount;
     ordersToAcceptMetaEl.innerText = pendingCount + ' pending confirmations';
 lowStockCountEl.innerText = lowStockItems.length;
-    lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.map(p => p.name).join(', ') : 'All products well stocked';
+    lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.length + ' product' + (lowStockItems.length === 1 ? '' : 's') + ' needed to restock' : 'All products well stocked';
     dailySalesValueEl.innerText = fmtCurrency(dailySales);
     monthlySalesValueEl.innerText = fmtCurrency(monthlySales);
 

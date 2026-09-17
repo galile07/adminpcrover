@@ -4,7 +4,7 @@
   --pc-blue: #315fb3;
   --pc-orange: #f26f21;
   --text-dark: #000000;
-  --bg-white: #ffffff;
+  --bg-white: #f6f7f9;
 }
 
 * {
@@ -15,7 +15,7 @@
 }
 
 body {
-  background-color: #fcfcfc;
+  background-color: #eceef1;
   color: #333;
 }
 
@@ -664,7 +664,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 .pos-cart-header {
   padding: 20px;
   border-bottom: 1px solid #eaeaea;
-  background: #fdfdfd;
+  background: #f2f3f6;
 }
 
 .pos-cart-header h3 {
@@ -704,7 +704,7 @@ button, input { outline: none; border: none; font-family: inherit; }
   height: 28px;
   border-radius: 50%;
   border: 1px solid #ccc;
-  background: white;
+  background: var(--bg-white);
   font-weight: bold;
   cursor: pointer;
   display: flex;
@@ -714,7 +714,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .pos-cart-summary {
   padding: 20px;
-  background: #fdfdfd;
+  background: #f2f3f6;
   border-top: 1px solid #eaeaea;
 }
 

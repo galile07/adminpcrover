@@ -397,7 +397,7 @@ const posGrid = document.querySelector('.pos-grid');
     _pendingTotal = sub;
     subtotalEl.innerText = fmtCurrency(sub);
     totalEl.innerText = fmtCurrency(sub);
-    checkoutBtn.innerText = 'Pay Out ' + fmtCurrency(sub);
+    checkoutBtn.innerText = 'Charge ' + fmtCurrency(sub);
     checkoutBtn.onclick = () => {
       if (cart.length === 0) { alert('Cart is empty!'); return; }
       openCashModal(sub);
@@ -524,8 +524,9 @@ if (recentOrdersBody) {
 
     const recentOrders = [...posOrders, ...onlineOrdersList];
 
-    const invProducts = await fetchAll('inventory');
-    const lowStockItems = invProducts.filter(p => p.enabled && p.stock <= (p.threshold || 5));
+const invProducts = await fetchAll('inventory');
+    const impProducts = await fetchAll('imported_products');
+    const lowStockItems = [...invProducts, ...impProducts].filter(p => p.enabled && (p.stock || 0) <= (p.threshold || 5));
 
     // Daily sales: filter today
     const today = getTodayStr();
@@ -544,8 +545,8 @@ if (recentOrdersBody) {
     recentOrdersCountEl.innerText = recentOrders.length;
     ordersToAcceptCountEl.innerText = pendingCount;
     ordersToAcceptMetaEl.innerText = pendingCount + ' pending confirmations';
-    lowStockCountEl.innerText = lowStockItems.length;
-lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.map(p => p.name).join(', ') : 'All products well stocked';
+lowStockCountEl.innerText = lowStockItems.length;
+    lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.map(p => p.name).join(', ') : 'All products well stocked';
     dailySalesValueEl.innerText = fmtCurrency(dailySales);
     monthlySalesValueEl.innerText = fmtCurrency(monthlySales);
 

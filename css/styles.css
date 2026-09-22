@@ -332,6 +332,15 @@ button, input { outline: none; border: none; font-family: inherit; }
   gap: 14px;
 }
 
+.order-search-row {
+  margin-bottom: 16px;
+}
+
+.order-search-row .modal-select {
+  max-width: 340px;
+  height: 42px;
+}
+
 .order-card {
   background: var(--bg-white);
   border: 1px solid var(--border);

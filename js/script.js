@@ -1168,8 +1168,18 @@ function cancelInfo(o) {
 
   function renderOrders(filterStatus) {
     const isCancelTab = filterStatus === 'cancelled';
+    const searchInput = document.getElementById('cancelledSearch');
+    const q = isCancelTab && searchInput ? String(searchInput.value || '').trim().toLowerCase() : '';
     const filtered = onlineOrders
-      .filter(o => isCancelTab ? (o.status === 'cancelled' || o.status === 'declined') : o.status === filterStatus)
+      .filter(o => {
+        const st = isCancelTab ? (o.status === 'cancelled' || o.status === 'declined') : o.status === filterStatus;
+        if (!st) return false;
+        if (q) {
+          const code = String(o.code || o.id || '').toLowerCase();
+          if (!code.includes(q)) return false;
+        }
+        return true;
+      })
       .sort((a, b) => orderTs(a) - orderTs(b));
     ordersContainer.innerHTML = filtered.length
       ? filtered.map(order => {
@@ -1265,9 +1275,18 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     tab.addEventListener('click', () => {
       filterTabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
+      const searchRow = document.getElementById('cancelledSearchRow');
+      if (searchRow) searchRow.style.display = tab.dataset.status === 'cancelled' ? 'block' : 'none';
       renderOrders(tab.dataset.status);
     });
   });
+
+  const cancelledSearchInput = document.getElementById('cancelledSearch');
+  if (cancelledSearchInput) {
+    cancelledSearchInput.addEventListener('input', () => {
+      if (document.querySelector('.sub-nav-item.active').dataset.status === 'cancelled') renderOrders('cancelled');
+    });
+  }
 }
 
 // ==========================================

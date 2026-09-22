@@ -386,6 +386,43 @@ button, input { outline: none; border: none; font-family: inherit; }
   color: var(--text-muted);
 }
 
+.order-card-cancelled {
+  border-left: 3px solid #e74c3c;
+}
+
+.cancel-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e74c3c;
+}
+
+.modal-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.modal-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-body);
+  background: var(--bg-white);
+}
+
+.modal-select:focus {
+  border-color: var(--pc-blue);
+  outline: none;
+}
+
+#cancelModal .modal-box {
+  width: 90%;
+  max-width: 420px;
+}
+
 /* =========================================
    Modal
    ========================================= */

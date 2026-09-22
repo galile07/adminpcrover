@@ -1081,12 +1081,12 @@ if (ordersContainer && filterTabs.length > 0) {
     if (changedImp) await upsertAll('imported_products', imp);
   }
 
-  async function callOrdersFn(action, order_id) {
+  async function callOrdersFn(action, order_id, extra) {
     if (!sbClient || !sbClient.functions) return false;
     try {
       const { error } = await sbClient.functions.invoke('admin-orders', {
         method: action ? 'POST' : 'GET',
-        body: action ? { action, order_id } : undefined
+        body: action ? { action, order_id, ...(extra || {}) } : undefined
       });
       if (error) throw error;
       return true;
@@ -1136,11 +1136,25 @@ if (ordersContainer && filterTabs.length > 0) {
     renderOrders('pending');
   })();
 
-function renderOrders(filterStatus) {
-    const filtered = onlineOrders.filter(o => o.status === filterStatus).sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
+function cancelName(v) {
+    const s = String(v || '').trim();
+    if (!s) return 'Customer';
+    return s.toLowerCase() === 'admin' ? 'Admin' : s;
+  }
+
+  function renderOrders(filterStatus) {
+    const isCancelTab = filterStatus === 'cancelled';
+    const filtered = onlineOrders
+      .filter(o => isCancelTab ? (o.status === 'cancelled' || o.status === 'declined') : o.status === filterStatus)
+      .sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
     ordersContainer.innerHTML = filtered.length
-      ? filtered.map(order => '<div class="order-card"><div class="order-card-top"><div><span class="order-id">#' + esc(order.code || order.id) + '</span><span class="order-time">' + esc(order.date) + ' ' + esc(order.time) + '</span></div><button class="btn-view" onclick="viewOrder(\'' + esc(order.id) + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + esc(order.customer) + '</div><div class="order-address">' + esc(order.address) + '</div></div></div>').join('')
-      : '<div style="text-align:center;color:#999;padding:60px 0;">There\'s nothing here.</div>';
+      ? filtered.map(order => {
+          const cancelMeta = isCancelTab
+            ? '<div class="cancel-meta">Cancelled by ' + esc(cancelName(order.cancelled_by)) + (order.cancelled_reason ? ' &middot; ' + esc(order.cancelled_reason) : '') + '</div>'
+            : '';
+          return '<div class="order-card' + (isCancelTab ? ' order-card-cancelled' : '') + '"><div class="order-card-top"><div><span class="order-id">#' + esc(order.code || order.id) + '</span><span class="order-time">' + esc(order.date) + ' ' + esc(order.time) + '</span></div><button class="btn-view" onclick="viewOrder(\'' + esc(order.id) + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + esc(order.customer) + '</div><div class="order-address">' + esc(order.address) + '</div>' + cancelMeta + '</div></div>';
+        }).join('')
+      : '<div style="text-align:center;color:var(--text-faint);padding:60px 0;">There\'s nothing here.</div>';
   }
 
   window.viewOrder = (id) => {
@@ -1148,11 +1162,17 @@ function renderOrders(filterStatus) {
     if (!order) return;
     const modal = document.getElementById('orderModal'), body = document.getElementById('modalBody'), footer = document.getElementById('modalFooter');
 const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><td>' + item.qty + '</td><td>' + fmtCurrency(item.price) + '</td><td>' + fmtCurrency(item.qty * item.price) + '</td></tr>').join('');
-    body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + esc(order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + esc(order.date) + ' ' + esc(order.time) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + esc(order.customer) + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + esc(order.address) + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + esc(order.phone) + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + esc(order.email) + '</span></div><h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
-    if (order.status === 'pending') footer.innerHTML = '<button class="btn btn-decline" onclick="declineOrder(\'' + order.id + '\')">Decline</button><button class="btn btn-primary" onclick="acceptOrder(\'' + order.id + '\')">Accept</button>';
-    else if (order.status === 'shipped') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
-    else if (order.status === 'delivered') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
-    else footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button>';
+    const isCancelled = order.status === 'cancelled' || order.status === 'declined';
+    const cancelRows = isCancelled
+      ? '<div class="modal-info-row"><span class="modal-label">Cancelled by</span><span>' + esc(cancelName(order.cancelled_by)) + '</span></div><div class="modal-info-row"><span class="modal-label">Reason</span><span>' + esc(order.cancelled_reason || 'No reason given') + '</span></div>'
+      : '';
+    body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + esc(order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + esc(order.date) + ' ' + esc(order.time) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + esc(order.customer) + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + esc(order.address) + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + esc(order.phone) + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + esc(order.email) + '</span></div>' + cancelRows + '<h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
+    const closeBtn = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button>';
+    if (isCancelled) footer.innerHTML = closeBtn;
+    else if (order.status === 'pending') footer.innerHTML = '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="acceptOrder(\'' + order.id + '\')">Accept</button>';
+    else if (order.status === 'shipped') footer.innerHTML = closeBtn + '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
+    else if (order.status === 'delivered') footer.innerHTML = closeBtn + '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
+    else footer.innerHTML = closeBtn;
     modal.style.display = 'flex';
   };
 
@@ -1187,6 +1207,28 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     if (o) { o.status = 'completed'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
+  };
+
+  let _cancelTargetId = null;
+  window.openCancelModal = (id) => {
+    const o = onlineOrders.find(x => x.id === id);
+    _cancelTargetId = id;
+    const note = document.getElementById('cancelModalNote');
+    if (note) note.textContent = 'Order #' + esc((o && (o.code || o.id)) || id) + ' will be cancelled and moved to the Cancelled tab.';
+    document.getElementById('cancelReasonSelect').value = 'inventory issue';
+    document.getElementById('cancelModal').style.display = 'flex';
+  };
+  window.closeCancelModal = () => { document.getElementById('cancelModal').style.display = 'none'; _cancelTargetId = null; };
+  window.confirmCancelOrder = async () => {
+    const id = _cancelTargetId;
+    if (!id) return;
+    const reason = document.getElementById('cancelReasonSelect').value;
+    await callOrdersFn('cancel', id, { reason });
+    const o = onlineOrders.find(x => x.id === id);
+    if (o) { o.status = 'cancelled'; o.cancelled_by = 'admin'; o.cancelled_reason = reason; persistOnlineOrders(); }
+    closeCancelModal();
+    closeOrderModal();
+    renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
   };
 
   window.__refreshOrders = async () => {

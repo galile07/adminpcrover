@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Online Orders</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=21" />
+  <link rel="stylesheet" href="css/styles.css?v=22" />
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
@@ -39,6 +39,7 @@
         <button class="sub-nav-item" data-status="shipped">To Deliver</button>
         <button class="sub-nav-item" data-status="delivered">To Finish</button>
         <button class="sub-nav-item" data-status="completed">Finished</button>
+        <button class="sub-nav-item" data-status="cancelled">Cancelled</button>
       </nav>
 
       <section class="page-content">
@@ -56,10 +57,34 @@
         </div>
       </div>
 
+      <div id="cancelModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Cancel Order</h3>
+            <button class="modal-close" onclick="closeCancelModal()">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-note" id="cancelModalNote">This order will be cancelled and moved to the Cancelled tab.</p>
+            <div class="form-group">
+              <span style="display:block;font-size:13px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Reason for cancellation</span>
+              <select id="cancelReasonSelect" class="modal-select">
+                <option value="inventory issue">Inventory issue</option>
+                <option value="price issue">Price issue</option>
+                <option value="operational overload">Operational overload</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeCancelModal()">Close</button>
+            <button class="btn btn-primary" onclick="confirmCancelOrder()">Confirm Cancellation</button>
+          </div>
+        </div>
+      </div>
+
 
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=27"></script>
+  <script src="js/script.js?v=28"></script>
 </body>
 </html>

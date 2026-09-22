@@ -53,6 +53,17 @@ Deno.serve(async (req) => {
       return json({ ok: true }, 200, corsHeaders);
     }
 
+    if (action === "cancel") {
+      const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+      const { error } = await supabase.from("orders").update({
+        status: "cancelled",
+        cancelled_by: "admin",
+        cancelled_reason: reason || null,
+      }).eq("id", order_id);
+      if (error) return json({ error: error.message }, 500, corsHeaders);
+      return json({ ok: true }, 200, corsHeaders);
+    }
+
     const statusMap: Record<string, string> = {
       accept: "shipped",
       deliver: "delivered",

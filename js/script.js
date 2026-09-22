@@ -238,6 +238,32 @@ function showConfirm(msg, onConfirm) {
   ov.onclick = (e) => { if (e.target === ov) ov.style.display = 'none'; };
 }
 
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('pcrover_theme', theme); } catch (e) {}
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.textContent = theme === 'dark' ? 'Light' : 'Dark';
+  if (window.__chartThemeUpdate) window.__chartThemeUpdate(theme);
+}
+
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+}
+
+function isDarkTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark';
+}
+
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('pcrover_theme'); } catch (e) {}
+  let theme = 'light';
+  if (saved === 'dark' || saved === 'light') theme = saved;
+  else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) theme = 'dark';
+  applyTheme(theme);
+})();
+
 const fmtCurrency = (a) => '₱' + a.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function getTodayStr() { return new Date().toISOString().split('T')[0]; }
@@ -582,8 +608,28 @@ lowStockCountEl.innerText = lowStockItems.length;
     if (typeof window.Chart !== 'undefined') {
       Chart.defaults.font.family = 'Inter, sans-serif';
       Chart.defaults.font.size = 12;
-      Chart.defaults.color = '#7d8597';
-      const C = { blue: '#315fb3', orange: '#f26f21', green: '#2e9e5b', purple: '#6b7aff', amber: '#f2a20c', red: '#e74c3c', gray: '#c3c8d2' };
+      const dark = isDarkTheme();
+      Chart.defaults.color = dark ? '#9aa6b8' : '#7d8597';
+      const chartEdge = dark ? '#1f2631' : '#ffffff';
+      window.__charts = window.__charts || [];
+      window.__chartThemeUpdate = (theme) => {
+        if (typeof window.Chart === 'undefined') return;
+        Chart.defaults.color = theme === 'dark' ? '#9aa6b8' : '#7d8597';
+        (window.__charts || []).forEach(ch => {
+          try {
+            if (ch.options && ch.options.scales) {
+              Object.keys(ch.options.scales).forEach(k => {
+                if (ch.options.scales[k] && ch.options.scales[k].grid) ch.options.scales[k].grid.color = theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+              });
+            }
+            if (ch.data && ch.data.datasets && ch.data.datasets.length) {
+              ch.data.datasets.forEach(ds => { if (ds.borderColor && !Array.isArray(ds.borderColor)) ds.borderColor = theme === 'dark' ? '#1f2631' : '#ffffff'; });
+            }
+            ch.update();
+          } catch (e) {}
+        });
+      };
+      const C = { blue: '#315fb3', blueLight: '#8aa8e0', green: '#2e9e5b', purple: '#6b7aff', amber: '#f2a20c', red: '#e74c3c', gray: '#c3c8d2' };
 
       const moneyTicks = (v) => '₱' + (v >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : v);
       const moneyLabel = (ctx) => ' ' + fmtCurrency(ctx.parsed.y ?? ctx.parsed);
@@ -597,14 +643,14 @@ lowStockCountEl.innerText = lowStockItems.length;
         salesLabels.push(d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
         salesValues.push(recentOrders.filter(o => o.date === iso).reduce((s, o) => s + o.amount, 0));
       }
-      new Chart(document.getElementById('salesTrendChart'), {
+      window.__charts.push(new Chart(document.getElementById('salesTrendChart'), {
         type: 'bar',
         data: {
           labels: salesLabels,
           datasets: [{
             label: 'Sales',
             data: salesValues,
-            backgroundColor: salesValues.map((v, i) => (i === salesValues.length - 1 ? C.orange : C.blue + 'd9')),
+            backgroundColor: salesValues.map((v, i) => (i === salesValues.length - 1 ? C.blue : C.blueLight)),
             borderRadius: 6,
             maxBarThickness: 40
           }]
@@ -614,21 +660,21 @@ lowStockCountEl.innerText = lowStockItems.length;
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: moneyLabel } } },
           scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: moneyTicks } } }
         }
-      });
+      }));
 
       // 2. Sales by channel — this month
       const monthOrders = recentOrders.filter(o => o.date >= monthStart);
       const channelOnline = monthOrders.filter(o => /online/i.test(o.type)).reduce((s, o) => s + o.amount, 0);
       const channelWalkin = monthOrders.filter(o => !/online/i.test(o.type)).reduce((s, o) => s + o.amount, 0);
       const channelHasData = channelOnline + channelWalkin > 0;
-      new Chart(document.getElementById('channelChart'), {
+      window.__charts.push(new Chart(document.getElementById('channelChart'), {
         type: 'doughnut',
         data: {
           labels: ['Online', 'Walk-in'],
           datasets: [{
             data: channelHasData ? [channelOnline, channelWalkin] : [1],
-            backgroundColor: channelHasData ? [C.blue, C.orange] : [C.gray],
-            borderColor: '#ffffff', borderWidth: 3, hoverOffset: 8
+            backgroundColor: channelHasData ? [C.blue, C.blueLight] : [C.gray],
+            borderColor: chartEdge, borderWidth: 3, hoverOffset: 8
           }]
         },
         options: {
@@ -638,7 +684,7 @@ lowStockCountEl.innerText = lowStockItems.length;
             tooltip: { enabled: channelHasData, callbacks: { label: (ctx) => ' ' + ctx.label + ': ' + fmtCurrency(ctx.parsed) } }
           }
         }
-      });
+      }));
 
       // 3. Order status distribution
       const statusColors = { pending: C.amber, completed: C.green, shipped: C.blue, delivered: C.purple, cancelled: C.red, declined: C.red };
@@ -649,14 +695,14 @@ lowStockCountEl.innerText = lowStockItems.length;
       });
       const statusKeys = Object.keys(statusMap);
       const statusHasData = statusKeys.length > 0;
-      new Chart(document.getElementById('statusChart'), {
+      window.__charts.push(new Chart(document.getElementById('statusChart'), {
         type: 'doughnut',
         data: {
           labels: statusHasData ? statusKeys.map(k => k.charAt(0).toUpperCase() + k.slice(1)) : ['No data'],
           datasets: [{
             data: statusHasData ? Object.values(statusMap) : [1],
             backgroundColor: statusHasData ? statusKeys.map(k => statusColors[k] || C.gray) : [C.gray],
-            borderColor: '#ffffff', borderWidth: 3, hoverOffset: 8
+            borderColor: chartEdge, borderWidth: 3, hoverOffset: 8
           }]
         },
         options: {
@@ -666,19 +712,19 @@ lowStockCountEl.innerText = lowStockItems.length;
             tooltip: { enabled: statusHasData }
           }
         }
-      });
+      }));
 
       // 4. Low-stock watch
       const lowProducts = [...lowStockItems].sort((a, b) => (a.stock || 0) - (b.stock || 0)).slice(0, 8).reverse();
       if (lowProducts.length) {
-        new Chart(document.getElementById('lowStockChart'), {
+        window.__charts.push(new Chart(document.getElementById('lowStockChart'), {
           type: 'bar',
           data: {
             labels: lowProducts.map(p => p.name),
             datasets: [{
               label: 'Stock',
               data: lowProducts.map(p => p.stock || 0),
-              backgroundColor: lowProducts.map(p => (p.stock === 0 ? C.red : (p.stock || 0) <= 2 ? C.orange : C.blue + 'cc')),
+              backgroundColor: lowProducts.map(p => (p.stock === 0 ? C.red : (p.stock || 0) <= 2 ? C.blue : C.blueLight)),
               borderRadius: 6,
               maxBarThickness: 16
             }]
@@ -691,7 +737,7 @@ lowStockCountEl.innerText = lowStockItems.length;
             },
             scales: { x: { beginAtZero: true, grid: { drawBorder: false } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } }
           }
-        });
+        }));
       } else {
         const emptyEl = document.getElementById('lowStockEmpty');
         if (emptyEl) emptyEl.style.display = 'block';
@@ -1104,9 +1150,9 @@ function renderOrders(filterStatus) {
 const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><td>' + item.qty + '</td><td>' + fmtCurrency(item.price) + '</td><td>' + fmtCurrency(item.qty * item.price) + '</td></tr>').join('');
     body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + esc(order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + esc(order.date) + ' ' + esc(order.time) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + esc(order.customer) + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + esc(order.address) + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + esc(order.phone) + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + esc(order.email) + '</span></div><h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
     if (order.status === 'pending') footer.innerHTML = '<button class="btn btn-decline" onclick="declineOrder(\'' + order.id + '\')">Decline</button><button class="btn btn-primary" onclick="acceptOrder(\'' + order.id + '\')">Accept</button>';
-    else if (order.status === 'shipped') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
-    else if (order.status === 'delivered') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
-    else footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button>';
+    else if (order.status === 'shipped') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
+    else if (order.status === 'delivered') footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button><button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
+    else footer.innerHTML = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button>';
     modal.style.display = 'flex';
   };
 

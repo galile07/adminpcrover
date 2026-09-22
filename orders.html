@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Online Orders</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=20" />
+  <link rel="stylesheet" href="css/styles.css?v=21" />
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
@@ -28,7 +28,10 @@
     <main class="main-content">
       <header class="header">
         <div class="header-info">Online Orders</div>
-        <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
+        <div class="header-actions">
+          <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle dark/light mode">Dark</button>
+          <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
+        </div>
       </header>
       
       <nav class="sub-nav">
@@ -57,6 +60,6 @@
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=26"></script>
+  <script src="js/script.js?v=27"></script>
 </body>
 </html>

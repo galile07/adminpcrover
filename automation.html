@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Price Automation</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=20" />
+  <link rel="stylesheet" href="css/styles.css?v=21" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="page-dashboard">
@@ -29,7 +29,10 @@
     <main class="main-content">
       <header class="header">
         <div class="header-info">Price Automation</div>
-        <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
+        <div class="header-actions">
+          <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle dark/light mode">Dark</button>
+          <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
+        </div>
       </header>
       <section class="page-content">
         <div class="section-heading">
@@ -109,7 +112,7 @@
             </form>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeRuleModal()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
+            <button class="btn btn-secondary" onclick="closeRuleModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
             <button class="btn btn-primary" onclick="saveRule()">Save Rule</button>
           </div>
         </div>
@@ -118,6 +121,6 @@
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=26"></script>
+  <script src="js/script.js?v=27"></script>
 </body>
 </html>

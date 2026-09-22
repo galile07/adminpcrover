@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Sync Settings</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=20" />
+  <link rel="stylesheet" href="css/styles.css?v=21" />
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
@@ -28,7 +28,10 @@
     <main class="main-content">
       <header class="header">
         <div class="header-info">Sync Settings</div>
-        <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
+        <div class="header-actions">
+          <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle dark/light mode">Dark</button>
+          <button class="btn btn-secondary" onclick="location.href='index.html'">Log out</button>
+        </div>
       </header>
       <section class="page-content">
         <div class="section-heading">
@@ -50,20 +53,20 @@
             <span id="lazadaStatusPill" class="status-pill status-unknown">Checking...</span>
           </div>
           <div style="padding:20px;">
-            <p style="color:#555;line-height:1.6;margin-bottom:16px;">Connect your Lazada seller account, then sync to pull your Lazada orders and products into the admin.</p>
+            <p style="color:var(--text-muted);line-height:1.6;margin-bottom:16px;">Connect your Lazada seller account, then sync to pull your Lazada orders and products into the admin.</p>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
               <button id="connectLazadaBtn" class="btn btn-primary" onclick="connectLazada()">Connect Lazada</button>
-              <button id="syncLazadaBtn" class="btn btn-secondary" onclick="syncLazada()" style="color:#555;border:1px solid #ccc;background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Sync Lazada</button>
+              <button id="syncLazadaBtn" class="btn btn-secondary" onclick="syncLazada()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Sync Lazada</button>
             </div>
-            <p id="lazadaStatusSub" style="color:#555;margin-top:16px;line-height:1.6;"></p>
-            <p id="lazadaSyncStatus" style="color:#555;margin-top:8px;white-space:pre-line;line-height:1.6;"></p>
+            <p id="lazadaStatusSub" style="color:var(--text-muted);margin-top:16px;line-height:1.6;"></p>
+            <p id="lazadaSyncStatus" style="color:var(--text-muted);margin-top:8px;white-space:pre-line;line-height:1.6;"></p>
           </div>
         </div>
       </section>
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=26"></script>
+  <script src="js/script.js?v=27"></script>
   <script>
     (function () {
       if (new URLSearchParams(window.location.search).get('connected') === '1') {

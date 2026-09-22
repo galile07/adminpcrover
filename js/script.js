@@ -1122,6 +1122,7 @@ if (ordersContainer && filterTabs.length > 0) {
           amount: o.total || 0,
           status: String(o.status || 'pending').toLowerCase(),
           date: dt.date, time: dt.time,
+          createdAt: o.created_at || '',
           cancel_reason: o.cancel_reason || '',
           cancelled_by: o.cancelled_by || '',
           cancelled_reason: o.cancelled_reason || '',
@@ -1153,11 +1154,23 @@ function cancelInfo(o) {
     };
   }
 
+  function orderTs(o) {
+    if (o.createdAt) {
+      const t = new Date(o.createdAt).getTime();
+      if (!isNaN(t)) return t;
+    }
+    const parts = String(o.time || '').match(/(\d+):(\d+)\s*(AM|PM)/i);
+    if (!parts || !o.date) return 0;
+    let h = parseInt(parts[1], 10) % 12;
+    if (/pm/i.test(parts[3])) h += 12;
+    return new Date(o.date + 'T' + String(h).padStart(2, '0') + ':' + parts[2] + ':00').getTime();
+  }
+
   function renderOrders(filterStatus) {
     const isCancelTab = filterStatus === 'cancelled';
     const filtered = onlineOrders
       .filter(o => isCancelTab ? (o.status === 'cancelled' || o.status === 'declined') : o.status === filterStatus)
-      .sort((a, b) => new Date(a.date + ' ' + a.time) - new Date(b.date + ' ' + b.time));
+      .sort((a, b) => orderTs(a) - orderTs(b));
     ordersContainer.innerHTML = filtered.length
       ? filtered.map(order => {
           const cancelMeta = isCancelTab

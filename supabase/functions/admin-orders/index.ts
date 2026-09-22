@@ -64,6 +64,14 @@ Deno.serve(async (req) => {
       return json({ ok: true }, 200, corsHeaders);
     }
 
+    if (action === "refund") {
+      const { error } = await supabase.from("orders").update({
+        refunded_at: new Date().toISOString(),
+      }).eq("id", order_id);
+      if (error) return json({ error: error.message }, 500, corsHeaders);
+      return json({ ok: true }, 200, corsHeaders);
+    }
+
     const statusMap: Record<string, string> = {
       accept: "shipped",
       deliver: "delivered",

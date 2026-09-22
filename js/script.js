@@ -1126,6 +1126,7 @@ if (ordersContainer && filterTabs.length > 0) {
           cancel_reason: o.cancel_reason || '',
           cancelled_by: o.cancelled_by || '',
           cancelled_reason: o.cancelled_reason || '',
+          refunded_at: o.refunded_at || '',
           items: parseOrderItems(o.items)
         };
       });
@@ -1166,6 +1167,12 @@ function cancelInfo(o) {
     return new Date(o.date + 'T' + String(h).padStart(2, '0') + ':' + parts[2] + ':00').getTime();
   }
 
+  function refundLabel(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
   function renderOrders(filterStatus) {
     const isCancelTab = filterStatus === 'cancelled';
     const searchInput = document.getElementById('cancelledSearch');
@@ -1184,7 +1191,7 @@ function cancelInfo(o) {
     ordersContainer.innerHTML = filtered.length
       ? filtered.map(order => {
           const cancelMeta = isCancelTab
-            ? '<div class="cancel-meta">Cancelled by ' + esc(cancelInfo(order).who) + ' &middot; ' + esc(cancelInfo(order).reason || 'No reason given') + '</div>'
+            ? '<div class="cancel-meta">Cancelled by ' + esc(cancelInfo(order).who) + ' &middot; ' + esc(cancelInfo(order).reason || 'No reason given') + (order.refunded_at ? ' <span class="refunded-chip">Refunded</span>' : '') + '</div>'
             : '';
           return '<div class="order-card' + (isCancelTab ? ' order-card-cancelled' : '') + '"><div class="order-card-top"><div><span class="order-id">#' + esc(order.code || order.id) + '</span><span class="order-time">' + esc(order.date) + ' ' + esc(order.time) + '</span></div><button class="btn-view" onclick="viewOrder(\'' + esc(order.id) + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + esc(order.customer) + '</div><div class="order-address">' + esc(order.address) + '</div>' + cancelMeta + '</div></div>';
         }).join('')
@@ -1203,7 +1210,9 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
       : '';
     body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + esc(order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + esc(order.date) + ' ' + esc(order.time) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + esc(order.customer) + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + esc(order.address) + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + esc(order.phone) + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + esc(order.email) + '</span></div>' + cancelRows + '<h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
     const closeBtn = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button>';
-    if (isCancelled) footer.innerHTML = closeBtn;
+    if (isCancelled) footer.innerHTML = closeBtn + (order.refunded_at
+      ? '<span class="refunded-badge">Refunded ' + esc(refundLabel(order.refunded_at)) + '</span>'
+      : '<button class="btn btn-refund" onclick="refundOrder(\'' + order.id + '\')">Mark as Refunded</button>');
     else if (order.status === 'pending') footer.innerHTML = '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="acceptOrder(\'' + order.id + '\')">Accept</button>';
     else if (order.status === 'shipped') footer.innerHTML = closeBtn + '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
     else if (order.status === 'delivered') footer.innerHTML = closeBtn + '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
@@ -1212,6 +1221,13 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
   };
 
   window.closeOrderModal = () => { document.getElementById('orderModal').style.display = 'none'; };
+  window.refundOrder = async (id) => {
+    await callOrdersFn('refund', id);
+    const o = onlineOrders.find(x => x.id === id);
+    if (o) { o.refunded_at = new Date().toISOString(); persistOnlineOrders(); }
+    renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
+    closeOrderModal();
+  };
   window.acceptOrder = async (id) => {
     await callOrdersFn('accept', id);
     const o = onlineOrders.find(x => x.id === id);

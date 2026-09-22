@@ -1122,6 +1122,9 @@ if (ordersContainer && filterTabs.length > 0) {
           amount: o.total || 0,
           status: String(o.status || 'pending').toLowerCase(),
           date: dt.date, time: dt.time,
+          cancel_reason: o.cancel_reason || '',
+          cancelled_by: o.cancelled_by || '',
+          cancelled_reason: o.cancelled_reason || '',
           items: parseOrderItems(o.items)
         };
       });
@@ -1136,10 +1139,18 @@ if (ordersContainer && filterTabs.length > 0) {
     renderOrders('pending');
   })();
 
-function cancelName(v) {
-    const s = String(v || '').trim();
-    if (!s) return 'Customer';
-    return s.toLowerCase() === 'admin' ? 'Admin' : s;
+function cancelInfo(o) {
+    const byRaw = String(o.cancelled_by || '').trim().toLowerCase();
+    const adminReason = String(o.cancelled_reason || '').trim();
+    const custReason = String(o.cancel_reason || '').trim();
+    const isAdmin = byRaw === 'admin' || (byRaw === '' && !!adminReason && !custReason);
+    return {
+      who: isAdmin ? 'Admin' : 'Customer',
+      isAdmin,
+      adminReason,
+      custReason,
+      reason: isAdmin ? adminReason : custReason
+    };
   }
 
   function renderOrders(filterStatus) {
@@ -1150,7 +1161,7 @@ function cancelName(v) {
     ordersContainer.innerHTML = filtered.length
       ? filtered.map(order => {
           const cancelMeta = isCancelTab
-            ? '<div class="cancel-meta">Cancelled by ' + esc(cancelName(order.cancelled_by)) + (order.cancelled_reason ? ' &middot; ' + esc(order.cancelled_reason) : '') + '</div>'
+            ? '<div class="cancel-meta">Cancelled by ' + esc(cancelInfo(order).who) + ' &middot; ' + esc(cancelInfo(order).reason || 'No reason given') + '</div>'
             : '';
           return '<div class="order-card' + (isCancelTab ? ' order-card-cancelled' : '') + '"><div class="order-card-top"><div><span class="order-id">#' + esc(order.code || order.id) + '</span><span class="order-time">' + esc(order.date) + ' ' + esc(order.time) + '</span></div><button class="btn-view" onclick="viewOrder(\'' + esc(order.id) + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + esc(order.customer) + '</div><div class="order-address">' + esc(order.address) + '</div>' + cancelMeta + '</div></div>';
         }).join('')
@@ -1163,8 +1174,9 @@ function cancelName(v) {
     const modal = document.getElementById('orderModal'), body = document.getElementById('modalBody'), footer = document.getElementById('modalFooter');
 const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><td>' + item.qty + '</td><td>' + fmtCurrency(item.price) + '</td><td>' + fmtCurrency(item.qty * item.price) + '</td></tr>').join('');
     const isCancelled = order.status === 'cancelled' || order.status === 'declined';
+    const cInfo = cancelInfo(order);
     const cancelRows = isCancelled
-      ? '<div class="modal-info-row"><span class="modal-label">Cancelled by</span><span>' + esc(cancelName(order.cancelled_by)) + '</span></div><div class="modal-info-row"><span class="modal-label">Reason</span><span>' + esc(order.cancelled_reason || 'No reason given') + '</span></div>'
+      ? '<div class="modal-info-row"><span class="modal-label">Cancelled by</span><span>' + esc(cInfo.who) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer reason</span><span>' + esc(cInfo.custReason || '—') + '</span></div><div class="modal-info-row"><span class="modal-label">Admin reason</span><span>' + esc(cInfo.adminReason || '—') + '</span></div>'
       : '';
     body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + esc(order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + esc(order.date) + ' ' + esc(order.time) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + esc(order.customer) + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + esc(order.address) + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + esc(order.phone) + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + esc(order.email) + '</span></div>' + cancelRows + '<h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
     const closeBtn = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button>';

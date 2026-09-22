@@ -36,36 +36,48 @@ async function lazadaGet(apiPath: string, params: Record<string, string>) {
 
 async function getValidAccessToken(supabase: any) {
   const { data: tok } = await supabase.from("lazada_tokens").select("*").eq("id", 1).single();
-  if (!tok?.access_token) return { access_token: null as string | null, refresh_token: null as string | null };
-  let access_token = tok.access_token;
-  let refresh_token = tok.refresh_token;
-
-  if (!tok.expires_at || new Date(tok.expires_at).getTime() < Date.now() + 5 * 60 * 1000) {
-    const params: Record<string, string> = {
-      app_key: APP_KEY,
-      access_token,
-      refresh_token,
-      sign_method: "sha256",
-      timestamp: String(Date.now()),
-    };
-    const signature = await sign("/auth/token/refresh", params, APP_SECRET);
-    const qs = new URLSearchParams({ ...params, sign: signature });
-    const resp = await fetch(`${AUTH_BASE}/auth/token/refresh?${qs}`);
-    const d = await resp.json();
-    if (d.access_token) {
-      access_token = d.access_token;
-      refresh_token = d.refresh_token || refresh_token;
-      const now = Date.now();
-      await supabase.from("lazada_tokens").upsert({
-        id: 1,
-        access_token,
-        refresh_token,
-        expires_at: new Date(now + Number(d.expires_in || 0) * 1000).toISOString(),
-        refresh_expires_at: new Date(now + Number(d.refresh_expires_in || 0) * 1000).toISOString(),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "id" });
-    }
+  if (!tok?.access_token || !tok?.refresh_token) {
+    return { error: "not_connected", message: "Lazada is not connected yet. Click Connect Lazada, authorize the account, then sync again." };
   }
+  const now = Date.now();
+  const accessExpired = !tok.expires_at || new Date(tok.expires_at).getTime() < now + 5 * 60 * 1000;
+  if (!accessExpired) return { access_token: tok.access_token as string, refresh_token: tok.refresh_token as string };
+
+  const refreshExpired = !tok.refresh_expires_at || new Date(tok.refresh_expires_at).getTime() < now;
+  if (refreshExpired) {
+    return { error: "reconnect_needed", message: "The Lazada connection has expired. Click Reconnect, authorize the seller account, then sync again." };
+  }
+
+  const params: Record<string, string> = {
+    app_key: APP_KEY,
+    access_token: tok.access_token,
+    refresh_token: tok.refresh_token,
+    sign_method: "sha256",
+    timestamp: String(now),
+  };
+  const signature = await sign("/auth/token/refresh", params, APP_SECRET);
+  const qs = new URLSearchParams({ ...params, sign: signature });
+  let d: any = null;
+  let refreshError = "";
+  try {
+    const resp = await fetch(`${AUTH_BASE}/auth/token/refresh?${qs}`);
+    d = await resp.json();
+  } catch (e) {
+    refreshError = String(e);
+  }
+  if (!d || !d.access_token) {
+    return { error: "refresh_failed", message: d?.message || refreshError || "Token refresh failed. Click Reconnect to authorize the seller account again." };
+  }
+  const access_token = d.access_token;
+  const refresh_token = d.refresh_token || tok.refresh_token;
+  await supabase.from("lazada_tokens").upsert({
+    id: 1,
+    access_token,
+    refresh_token,
+    expires_at: new Date(now + Number(d.expires_in || 0) * 1000).toISOString(),
+    refresh_expires_at: new Date(now + Number(d.refresh_expires_in || 0) * 1000).toISOString(),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "id" });
   return { access_token, refresh_token };
 }
 
@@ -189,10 +201,12 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
   );
 
-  const { access_token, refresh_token } = await getValidAccessToken(supabase);
-  if (!access_token) {
-    return json({ ok: false, error: "not_connected", message: "Lazada is not connected yet. Click Connect Lazada, authorize the account, then sync again." }, 200, cors);
+  const tok = await getValidAccessToken(supabase);
+  if (tok.error || !tok.access_token) {
+    return json({ ok: false, error: tok.error || "not_connected", message: tok.message || "Lazada is not connected." }, 200, cors);
   }
+  const access_token = tok.access_token;
+  const refresh_token = tok.refresh_token;
 
   const now = new Date();
   const params: Record<string, string> = {

@@ -1187,7 +1187,7 @@ function cancelInfo(o) {
         }
         return true;
       })
-      .sort((a, b) => orderTs(a) - orderTs(b));
+      .sort((a, b) => (isCancelTab ? (a.refunded_at ? 1 : 0) - (b.refunded_at ? 1 : 0) : 0) || orderTs(a) - orderTs(b));
     ordersContainer.innerHTML = filtered.length
       ? filtered.map(order => {
           const cancelMeta = isCancelTab

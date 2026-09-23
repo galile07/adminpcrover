@@ -1165,15 +1165,19 @@ if (ordersContainer && filterTabs.length > 0) {
   }
 
   async function callOrdersFn(action, order_id, extra) {
-    if (!sbClient || !sbClient.functions) return false;
+    if (!sbClient || !sbClient.functions) return { ok: false, error: 'Supabase client not ready' };
     try {
       const { error } = await sbClient.functions.invoke('admin-orders', {
         method: action ? 'POST' : 'GET',
         body: action ? { action, order_id, ...(extra || {}) } : undefined
       });
       if (error) throw error;
-      return true;
-    } catch (e) { console.warn('admin-orders call failed:', e); return false; }
+      return { ok: true };
+    } catch (e) {
+      const msg = (e && (e.message || (e.context && e.context.message))) || String(e);
+      console.error('admin-orders call failed:', msg);
+      return { ok: false, error: msg };
+    }
   }
 
   function orderDateTime(iso) {
@@ -1305,7 +1309,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
 
   window.closeOrderModal = () => { document.getElementById('orderModal').style.display = 'none'; };
   window.refundOrder = async (id) => {
-    if (!(await callOrdersFn('refund', id))) { showToast('Failed to mark as refunded. Please try again.', 'error'); return; }
+    const r = await callOrdersFn('refund', id);
+    if (!r.ok) { showToast('Failed to mark as refunded: ' + r.error, 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) { o.refunded_at = new Date().toISOString(); persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
@@ -1313,7 +1318,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     showToast('Order marked as refunded.', 'success');
   };
   window.acceptOrder = async (id) => {
-    if (!(await callOrdersFn('accept', id))) { showToast('Failed to accept order. Please try again.', 'error'); return; }
+    const r = await callOrdersFn('accept', id);
+    if (!r.ok) { showToast('Failed to accept order: ' + r.error, 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) {
       await deductStockByName(o.items);
@@ -1325,7 +1331,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     showToast('Order accepted.', 'success');
   };
   window.declineOrder = async (id) => {
-    if (!(await callOrdersFn('decline', id))) { showToast('Failed to decline order. Please try again.', 'error'); return; }
+    const r = await callOrdersFn('decline', id);
+    if (!r.ok) { showToast('Failed to decline order: ' + r.error, 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) { o.status = 'declined'; o.cancelled_by = 'admin'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
@@ -1334,7 +1341,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     showToast('Order declined.', 'success');
   };
   window.deliverOrder = async (id) => {
-    if (!(await callOrdersFn('deliver', id))) { showToast('Failed to update order. Please try again.', 'error'); return; }
+    const r = await callOrdersFn('deliver', id);
+    if (!r.ok) { showToast('Failed to update order: ' + r.error, 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) { o.status = 'delivered'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
@@ -1342,7 +1350,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     showToast('Order marked as to be delivered.', 'success');
   };
   window.finishOrder = async (id) => {
-    if (!(await callOrdersFn('finish', id))) { showToast('Failed to finish order. Please try again.', 'error'); return; }
+    const r = await callOrdersFn('finish', id);
+    if (!r.ok) { showToast('Failed to finish order: ' + r.error, 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) { o.status = 'completed'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
@@ -1365,7 +1374,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     const id = _cancelTargetId;
     if (!id) return;
     const reason = document.getElementById('cancelReasonSelect').value;
-    if (!(await callOrdersFn('cancel', id, { reason }))) { showToast('Failed to cancel order. Please try again.', 'error'); return; }
+    const r = await callOrdersFn('cancel', id, { reason });
+    if (!r.ok) { showToast('Failed to cancel order: ' + r.error + ' (The order was NOT changed.)', 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) { o.status = 'cancelled'; o.cancelled_by = 'admin'; o.cancelled_reason = reason; persistOnlineOrders(); }
     closeCancelModal();

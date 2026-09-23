@@ -49,8 +49,8 @@ Deno.serve(async (req) => {
 
     if (action === "decline") {
       const { error } = await supabase.from("orders").update({
-        status: "declined",
-        cancelled_by: "admin",
+        status: "cancelled",
+        cancelled_by: "seller",
         cancelled_reason: null,
       }).eq("id", order_id);
       if (error) return json({ error: error.message }, 500, corsHeaders);
@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
       const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
       const { error } = await supabase.from("orders").update({
         status: "cancelled",
-        cancelled_by: "admin",
+        cancelled_by: "seller",
         cancelled_reason: reason || null,
       }).eq("id", order_id);
       if (error) return json({ error: error.message }, 500, corsHeaders);

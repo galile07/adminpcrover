@@ -1232,7 +1232,7 @@ function cancelInfo(o) {
     const byRaw = String(o.cancelled_by || '').trim().toLowerCase();
     const adminReason = String(o.cancelled_reason || '').trim();
     const custReason = String(o.cancel_reason || '').trim();
-    const isAdmin = byRaw === 'admin' || (byRaw === '' && !!adminReason && !custReason);
+    const isAdmin = byRaw === 'admin' || byRaw === 'seller' || (byRaw === '' && !!adminReason && !custReason);
     return {
       who: isAdmin ? 'Admin' : 'Customer',
       isAdmin,
@@ -1334,7 +1334,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     const r = await callOrdersFn('decline', id);
     if (!r.ok) { showToast('Failed to decline order: ' + r.error, 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
-    if (o) { o.status = 'declined'; o.cancelled_by = 'admin'; persistOnlineOrders(); }
+    if (o) { o.status = 'cancelled'; o.cancelled_by = 'seller'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
     refreshNavNotifications();
@@ -1377,7 +1377,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     const r = await callOrdersFn('cancel', id, { reason });
     if (!r.ok) { showToast('Failed to cancel order: ' + r.error + ' (The order was NOT changed.)', 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
-    if (o) { o.status = 'cancelled'; o.cancelled_by = 'admin'; o.cancelled_reason = reason; persistOnlineOrders(); }
+    if (o) { o.status = 'cancelled'; o.cancelled_by = 'seller'; o.cancelled_reason = reason; persistOnlineOrders(); }
     closeCancelModal();
     closeOrderModal();
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);

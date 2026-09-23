@@ -447,7 +447,7 @@ const posGrid = document.querySelector('.pos-grid');
     _pendingTotal = sub;
     subtotalEl.innerText = fmtCurrency(sub);
     totalEl.innerText = fmtCurrency(sub);
-    checkoutBtn.innerText = 'Charge ' + fmtCurrency(sub);
+    checkoutBtn.innerText = 'Pay Out ' + fmtCurrency(sub);
 checkoutBtn.onclick = () => {
       if (cart.length === 0) { showToast('Cart is empty!', 'error'); return; }
       openCashModal(sub);

@@ -118,21 +118,24 @@ function setNavBadge(id, show) {
 }
 async function refreshNavNotifications() {
   if (!document.getElementById('navBadgeOrders') && !document.getElementById('navBadgeInventory')) return;
-  let pending = 0;
+  let gotOrders = false, gotInv = false, pending = 0, low = 0;
   if (sbClient && sbClient.functions) {
     try {
-      const { data } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
-      pending = ((data && data.orders) || []).filter(o => String(o.status || '').toLowerCase() === 'pending').length;
+      const { data, error } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
+      if (!error && data && Array.isArray(data.orders)) {
+        gotOrders = true;
+        pending = data.orders.filter(o => String(o.status || '').toLowerCase() === 'pending').length;
+      }
     } catch (e) {}
   }
-  let low = 0;
   try {
     const inv = await fetchAll('inventory');
     const imp = await fetchAll('imported_products');
+    gotInv = true;
     low = [...inv, ...imp].filter(p => p.enabled && (p.stock || 0) <= (p.threshold || 5)).length;
   } catch (e) {}
-  setNavBadge('navBadgeOrders', pending > 0);
-  setNavBadge('navBadgeInventory', low > 0);
+  if (gotOrders) setNavBadge('navBadgeOrders', pending > 0);
+  if (gotInv) setNavBadge('navBadgeInventory', low > 0);
 }
 
 // ==========================================
@@ -626,7 +629,7 @@ const invProducts = await fetchAll('inventory');
     ordersToAcceptCountEl.innerText = pendingCount;
     ordersToAcceptMetaEl.innerText = pendingCount + ' pending confirmations';
 lowStockCountEl.innerText = lowStockItems.length;
-    setNavBadge('navBadgeOrders', pendingCount > 0);
+    if (pendingCount > 0) setNavBadge('navBadgeOrders', true);
     setNavBadge('navBadgeInventory', lowStockItems.length > 0);
     lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.length + ' product' + (lowStockItems.length === 1 ? '' : 's') + ' needed to restock' : 'All products well stocked';
     dailySalesValueEl.innerText = fmtCurrency(dailySales);
@@ -1483,6 +1486,7 @@ window.toggleRule = async (id) => {
 
 // Global: refresh sidebar notification dots once the client is ready
 setTimeout(function () { refreshNavNotifications(); }, 1600);
+setTimeout(function () { refreshNavNotifications(); }, 4000);
 setInterval(function () { refreshNavNotifications(); }, 12 * 60 * 1000);
 
 

@@ -841,6 +841,11 @@ button, input { outline: none; border: none; font-family: inherit; }
   font-weight: 600;
   color: var(--text-dark);
   margin-bottom: 5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.5em;
 }
 
 .pos-item-price {

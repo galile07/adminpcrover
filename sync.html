@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER Sync Settings</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=24" />
+  <link rel="stylesheet" href="css/styles.css?v=25" />
 </head>
 <body class="page-dashboard">
   <div class="layout-shell">
@@ -19,8 +19,8 @@
       <nav class="nav-links">
         <a href="dashboard.html" class="nav-link"><span>Dashboard</span></a>
         <a href="pos.html" class="nav-link"><span>POS System</span></a>
-        <a href="orders.html" class="nav-link"><span>Online Orders</span></a>
-        <a href="inventory.html" class="nav-link"><span>Inventory</span></a>
+        <a href="orders.html" class="nav-link"><span><span class="nav-badge" id="navBadgeOrders"></span>Online Orders</span></a>
+        <a href="inventory.html" class="nav-link"><span><span class="nav-badge" id="navBadgeInventory"></span>Inventory</span></a>
         <a href="automation.html" class="nav-link"><span>Price Automation</span></a>
         <a href="sync.html" class="nav-link active"><span>Sync Settings</span></a>
       </nav>
@@ -66,7 +66,7 @@
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=35"></script>
+  <script src="js/script.js?v=36"></script>
   <script>
     (function () {
       if (new URLSearchParams(window.location.search).get('connected') === '1') {

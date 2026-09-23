@@ -110,6 +110,32 @@ function ruleAdjustedPrice(product) {
 }
 
 // ==========================================
+// SIDEBAR NOTIFICATION DOTS
+// ==========================================
+function setNavBadge(id, show) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('show', !!show);
+}
+async function refreshNavNotifications() {
+  if (!document.getElementById('navBadgeOrders') && !document.getElementById('navBadgeInventory')) return;
+  let pending = 0;
+  if (sbClient && sbClient.functions) {
+    try {
+      const { data } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
+      pending = ((data && data.orders) || []).filter(o => String(o.status || '').toLowerCase() === 'pending').length;
+    } catch (e) {}
+  }
+  let low = 0;
+  try {
+    const inv = await fetchAll('inventory');
+    const imp = await fetchAll('imported_products');
+    low = [...inv, ...imp].filter(p => p.enabled && (p.stock || 0) <= (p.threshold || 5)).length;
+  } catch (e) {}
+  setNavBadge('navBadgeOrders', pending > 0);
+  setNavBadge('navBadgeInventory', low > 0);
+}
+
+// ==========================================
 // LAZADA SYNC (global)
 // ==========================================
 function setLazadaSync(msg) {
@@ -600,6 +626,8 @@ const invProducts = await fetchAll('inventory');
     ordersToAcceptCountEl.innerText = pendingCount;
     ordersToAcceptMetaEl.innerText = pendingCount + ' pending confirmations';
 lowStockCountEl.innerText = lowStockItems.length;
+    setNavBadge('navBadgeOrders', pendingCount > 0);
+    setNavBadge('navBadgeInventory', lowStockItems.length > 0);
     lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.length + ' product' + (lowStockItems.length === 1 ? '' : 's') + ' needed to restock' : 'All products well stocked';
     dailySalesValueEl.innerText = fmtCurrency(dailySales);
     monthlySalesValueEl.innerText = fmtCurrency(monthlySales);
@@ -757,9 +785,17 @@ if (inventoryTableBody) {
   let _invSource = 'all';
   window.filterInventory = (source) => {
     _invSource = source;
+    _invPage = 1;
     document.querySelectorAll('.sub-nav-item').forEach(b => b.classList.toggle('active', b.dataset.source === source));
     renderInv();
   };
+
+  let _invPage = 1;
+  const INV_PER_PAGE = 10;
+
+  function invLowRank(p) {
+    return p.enabled && (p.stock || 0) <= (p.threshold || 5) ? 0 : 1;
+  }
 
   function invStatusPill(p) {
     if (!p.enabled) return '<span class="status-pill paused">Disabled</span>';
@@ -769,15 +805,51 @@ if (inventoryTableBody) {
     return '<span class="status-pill active">In Stock</span>';
   }
 
+  function renderInvPagination(total, totalPages, start) {
+    const el = document.getElementById('inventoryPagination');
+    if (!el) return;
+    if (total === 0) { el.innerHTML = ''; return; }
+    const end = Math.min(start + INV_PER_PAGE, total);
+    let html = '<span class="page-info">Showing ' + (start + 1) + '&#8211;' + end + ' of ' + total + '</span>';
+    html += '<button class="page-btn" ' + (_invPage <= 1 ? 'disabled' : 'onclick="invGoToPage(' + (_invPage - 1) + ')"') + '>Prev</button>';
+    let pages = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages = [1, _invPage - 1, _invPage, _invPage + 1, totalPages].filter((v, i, a) => v >= 1 && v <= totalPages && a.indexOf(v) === i).sort((x, y) => x - y);
+    }
+    let last = 0;
+    pages.forEach(n => {
+      if (last && n - last > 1) html += '<span class="page-ellipsis">&#8230;</span>';
+      html += '<button class="page-btn' + (n === _invPage ? ' active' : '') + '" onclick="invGoToPage(' + n + ')">' + n + '</button>';
+      last = n;
+    });
+    html += '<button class="page-btn" ' + (_invPage >= totalPages ? 'disabled' : 'onclick="invGoToPage(' + (_invPage + 1) + ')"') + '>Next</button>';
+    el.innerHTML = html;
+  }
+
   async function renderInv() {
     await getRules();
     const inv = await fetchInv();
     const imp = await fetchAll('imported_products');
     const fmt = (a) => '₱' + a.toLocaleString('en-US', { minimumFractionDigits: 2 });
     let all = [...inv.map(p => ({ ...p, _src: 'inventory' })), ...imp.map(p => ({ ...p, _src: 'imported' }))];
+    setNavBadge('navBadgeInventory', all.some(p => p.enabled && (p.stock || 0) <= (p.threshold || 5)));
     if (_invSource !== 'all') all = all.filter(p => p._src === _invSource);
 
-    inventoryTableBody.innerHTML = all.length ? all.map(p => {
+    const qEl = document.getElementById('inventorySearch');
+    const q = qEl ? String(qEl.value || '').trim().toLowerCase() : '';
+    if (q) all = all.filter(p => String(p.name || '').toLowerCase().includes(q) || String(p.category || '').toLowerCase().includes(q));
+
+    all.sort((a, b) => (invLowRank(a) - invLowRank(b)) || ((a.stock || 0) - (b.stock || 0)));
+
+    const total = all.length;
+    const totalPages = Math.max(1, Math.ceil(total / INV_PER_PAGE));
+    if (_invPage > totalPages) _invPage = totalPages;
+    const start = (_invPage - 1) * INV_PER_PAGE;
+    const pageItems = all.slice(start, start + INV_PER_PAGE);
+
+    inventoryTableBody.innerHTML = pageItems.length ? pageItems.map(p => {
       let toggleHtml;
       if (p._src === 'imported') {
         toggleHtml = '<button class="btn-toggle ' + (p.enabled ? 'active' : 'inactive') + '" onclick="toggleImportProduct(' + p.id + ')">' + (p.enabled ? 'Active' : 'Disabled') + '</button>';
@@ -800,6 +872,14 @@ const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="
 '</td>' +
       '</tr>';
     }).join('') : '<tr><td colspan="7" style="text-align:center;color:#999;padding:30px 0;">There\'s nothing here.</td></tr>';
+    renderInvPagination(total, totalPages, start);
+  }
+
+  window.invGoToPage = (n) => { _invPage = n; renderInv(); }; 
+
+  const inventorySearchInput = document.getElementById('inventorySearch');
+  if (inventorySearchInput) {
+    inventorySearchInput.addEventListener('input', () => { _invPage = 1; renderInv(); });
   }
 
 window.toggleProduct = async (id) => {
@@ -1237,6 +1317,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
+    refreshNavNotifications();
   };
   window.declineOrder = async (id) => {
     await callOrdersFn('decline', id);
@@ -1244,6 +1325,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     if (idx !== -1) { onlineOrders.splice(idx, 1); persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
+    refreshNavNotifications();
   };
   window.deliverOrder = async (id) => {
     await callOrdersFn('deliver', id);
@@ -1258,6 +1340,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     if (o) { o.status = 'completed'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
+    refreshNavNotifications();
   };
 
   let _cancelTargetId = null;
@@ -1280,6 +1363,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     closeCancelModal();
     closeOrderModal();
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
+    refreshNavNotifications();
   };
 
   window.__refreshOrders = async () => {
@@ -1396,6 +1480,10 @@ window.toggleRule = async (id) => {
     })());
   };
 }
+
+// Global: refresh sidebar notification dots once the client is ready
+setTimeout(function () { refreshNavNotifications(); }, 1600);
+setInterval(function () { refreshNavNotifications(); }, 12 * 60 * 1000);
 
 
 

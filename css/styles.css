@@ -223,6 +223,20 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .nav-links .nav-link:hover { transform: scale(1.03); }
 
+.nav-links .nav-badge {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e74c3c;
+  margin-right: 6px;
+  vertical-align: middle;
+  visibility: hidden;
+  box-shadow: 0 0 6px rgba(231, 76, 60, 0.8);
+}
+
+.nav-links .nav-badge.show { visibility: visible; }
+
 .nav-links .nav-link.active span, 
 .nav-links .nav-link:hover span {
   text-decoration: underline;
@@ -397,6 +411,65 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .order-card-cancelled {
   border-left: 3px solid #e74c3c;
+}
+
+.inventory-search-row {
+  margin-bottom: 14px;
+}
+
+.inventory-search-row .form-input {
+  max-width: 360px;
+  height: 42px;
+}
+
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 0 4px;
+  flex-wrap: wrap;
+}
+
+.page-btn {
+  min-width: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg-white);
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  border-color: var(--pc-blue);
+  color: var(--pc-blue);
+}
+
+.page-btn.active {
+  background: var(--pc-blue);
+  border-color: var(--pc-blue);
+  color: #fff;
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.page-info {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-right: 8px;
+}
+
+.page-ellipsis {
+  font-size: 13px;
+  color: var(--text-faint);
+  padding: 0 2px;
 }
 
 .cancel-meta {

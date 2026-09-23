@@ -48,7 +48,11 @@ Deno.serve(async (req) => {
     if (!order_id) return json({ error: "order_id is required" }, 400, corsHeaders);
 
     if (action === "decline") {
-      const { error } = await supabase.from("orders").delete().eq("id", order_id);
+      const { error } = await supabase.from("orders").update({
+        status: "declined",
+        cancelled_by: "admin",
+        cancelled_reason: null,
+      }).eq("id", order_id);
       if (error) return json({ error: error.message }, 500, corsHeaders);
       return json({ ok: true }, 200, corsHeaders);
     }

@@ -1305,14 +1305,15 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
 
   window.closeOrderModal = () => { document.getElementById('orderModal').style.display = 'none'; };
   window.refundOrder = async (id) => {
-    await callOrdersFn('refund', id);
+    if (!(await callOrdersFn('refund', id))) { showToast('Failed to mark as refunded. Please try again.', 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) { o.refunded_at = new Date().toISOString(); persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
+    showToast('Order marked as refunded.', 'success');
   };
   window.acceptOrder = async (id) => {
-    await callOrdersFn('accept', id);
+    if (!(await callOrdersFn('accept', id))) { showToast('Failed to accept order. Please try again.', 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) {
       await deductStockByName(o.items);
@@ -1321,29 +1322,33 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
     refreshNavNotifications();
+    showToast('Order accepted.', 'success');
   };
   window.declineOrder = async (id) => {
-    await callOrdersFn('decline', id);
-    const idx = onlineOrders.findIndex(o => o.id === id);
-    if (idx !== -1) { onlineOrders.splice(idx, 1); persistOnlineOrders(); }
+    if (!(await callOrdersFn('decline', id))) { showToast('Failed to decline order. Please try again.', 'error'); return; }
+    const o = onlineOrders.find(x => x.id === id);
+    if (o) { o.status = 'declined'; o.cancelled_by = 'admin'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
     refreshNavNotifications();
+    showToast('Order declined.', 'success');
   };
   window.deliverOrder = async (id) => {
-    await callOrdersFn('deliver', id);
+    if (!(await callOrdersFn('deliver', id))) { showToast('Failed to update order. Please try again.', 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) { o.status = 'delivered'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
+    showToast('Order marked as to be delivered.', 'success');
   };
   window.finishOrder = async (id) => {
-    await callOrdersFn('finish', id);
+    if (!(await callOrdersFn('finish', id))) { showToast('Failed to finish order. Please try again.', 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) { o.status = 'completed'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
     refreshNavNotifications();
+    showToast('Order marked as finished.', 'success');
   };
 
   let _cancelTargetId = null;
@@ -1360,13 +1365,14 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     const id = _cancelTargetId;
     if (!id) return;
     const reason = document.getElementById('cancelReasonSelect').value;
-    await callOrdersFn('cancel', id, { reason });
+    if (!(await callOrdersFn('cancel', id, { reason }))) { showToast('Failed to cancel order. Please try again.', 'error'); return; }
     const o = onlineOrders.find(x => x.id === id);
     if (o) { o.status = 'cancelled'; o.cancelled_by = 'admin'; o.cancelled_reason = reason; persistOnlineOrders(); }
     closeCancelModal();
     closeOrderModal();
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     refreshNavNotifications();
+    showToast('Order cancelled.', 'success');
   };
 
   window.__refreshOrders = async () => {

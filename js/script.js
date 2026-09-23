@@ -53,6 +53,87 @@ async function deleteAll(table) {
 }
 
 // ==========================================
+// OFFLINE POS SUPPORT (global)
+// ==========================================
+function _genUid() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+function posPendingCount() {
+  try { return JSON.parse(localStorage.getItem('posOrders') || '[]').filter(o => o.pendingSync).length; } catch (e) { return 0; }
+}
+async function flushPendingPos() {
+  if (!sbClient) return;
+  try {
+    const { error } = await sb('pos_orders').select('id').limit(1);
+    if (error) return;
+  } catch (e) { return; }
+  let anything = false;
+  for (let pass = 0; pass < 10; pass++) {
+    let rec = JSON.parse(localStorage.getItem('posOrders') || '[]');
+    const idx = rec.findIndex(o => o.pendingSync);
+    if (idx === -1) break;
+    const o = rec[idx];
+    const payload = { customer: o.customer || 'Walk-in Customer', type: o.type || 'Walk-in', amount: o.amount, status: o.status || 'Completed', date: o.date };
+    try {
+      const { data, error } = await sb('pos_orders').insert(payload).select();
+      if (error) return;
+      if (data && data[0]) {
+        rec = JSON.parse(localStorage.getItem('posOrders') || '[]');
+        const i = rec.findIndex(r => r._syncUid === o._syncUid);
+        if (i !== -1) {
+          rec[i].id = data[0].id;
+          delete rec[i].pendingSync;
+          delete rec[i]._syncUid;
+          localStorage.setItem('posOrders', JSON.stringify(rec));
+        }
+        anything = true;
+      }
+    } catch (e) { return; }
+  }
+  if (localStorage.getItem('_posStockDirty') === '1') {
+    try {
+      const inv = JSON.parse(localStorage.getItem('inventory') || '[]');
+      const imp = JSON.parse(localStorage.getItem('imported_products') || '[]');
+      if (inv.length) { const r1 = await sbClient.from('inventory').upsert(inv, { onConflict: 'id' }); if (r1.error) throw r1.error; }
+      if (imp.length) { const r2 = await sbClient.from('imported_products').upsert(imp, { onConflict: 'id' }); if (r2.error) throw r2.error; }
+      localStorage.removeItem('_posStockDirty');
+      anything = true;
+    } catch (e) {}
+  }
+  if (anything) showToast('Offline orders synced to the dashboard.', 'success');
+  updatePosSyncBanner();
+}
+function updatePosSyncBanner() {
+  const offline = navigator.onLine === false;
+  const pending = posPendingCount();
+  let b = document.getElementById('posSyncBanner');
+  if (!offline && pending === 0) { if (b) b.remove(); return; }
+  if (!b) { b = document.createElement('div'); b.id = 'posSyncBanner'; document.body.appendChild(b); }
+  b.className = 'posSyncBanner' + (offline ? ' offline' : ' syncing');
+  b.textContent = offline
+    ? 'Offline mode — POS keeps working. ' + (pending ? pending + ' order(s) waiting to sync once reconnected.' : 'Orders made now will sync automatically.')
+    : 'Syncing... ' + pending + ' offline order(s) remaining.';
+}
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    navigator.serviceWorker.register('sw.js').catch(function (e) { console.warn('SW register failed:', e); });
+  }
+}
+window.addEventListener('online', function () { updatePosSyncBanner(); flushPendingPos(); });
+window.addEventListener('offline', updatePosSyncBanner);
+setInterval(function () { if (navigator.onLine === false || posPendingCount() > 0) flushPendingPos(); }, 30000);
+function launchOfflineSupport() {
+  registerServiceWorker();
+  updatePosSyncBanner();
+  if (posPendingCount() > 0) flushPendingPos();
+}
+launchOfflineSupport();
+
+// ==========================================
 // HELPERS: price rules cache
 // ==========================================
 let _rulesCache = null;
@@ -529,21 +610,31 @@ document.getElementById('cashConfirmBtn').onclick = () => {
         id: '#' + String(Date.now()).slice(-4),
         customer: 'Walk-in Customer', type: 'Walk-in',
         amount: total, status: 'Completed',
-        date: getTodayStr()
+        date: getTodayStr(),
+        _syncUid: _genUid(),
+        pendingSync: true
       };
       const s = JSON.parse(localStorage.getItem('posOrders') || '[]');
       s.unshift(order); localStorage.setItem('posOrders', JSON.stringify(s));
-      if (sbClient) {
+      const tryInsert = async () => {
+        if (!sbClient) return false;
         try {
           const { data: inserted, error } = await sb('pos_orders').insert({ customer: order.customer, type: order.type, amount: order.amount, status: order.status, date: order.date }).select();
           if (error) throw error;
           if (inserted && inserted[0]) {
             const rec = JSON.parse(localStorage.getItem('posOrders') || '[]');
-            const i = rec.findIndex(x => x.id === order.id);
-            if (i !== -1) { rec[i].id = inserted[0].id; localStorage.setItem('posOrders', JSON.stringify(rec)); }
+            const i = rec.findIndex(x => x._syncUid === order._syncUid);
+            if (i !== -1) { rec[i].id = inserted[0].id; delete rec[i].pendingSync; delete rec[i]._syncUid; localStorage.setItem('posOrders', JSON.stringify(rec)); }
           }
-} catch(e) { console.warn('pos order sync failed:', e); }
-      }
+          return true;
+        } catch (e) {
+          localStorage.setItem('_posStockDirty', '1');
+          console.warn('pos order sync failed (kept offline):', e);
+          return false;
+        }
+      };
+      if (navigator.onLine === false) localStorage.setItem('_posStockDirty', '1');
+      if (!(await tryInsert())) updatePosSyncBanner();
       showToast('Transaction completed! Change: ' + fmtCurrency(rec - total), 'success');
       } catch(e) { showToast('Transaction failed: ' + (e.message || 'Unknown error'), 'error'); }
       closeCashModal();

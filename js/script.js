@@ -1338,9 +1338,7 @@ function cancelInfo(o) {
     const v = String(pm || '').trim().toLowerCase();
     if (v === 'gcash') return 'GCash';
     if (v === 'pickup') return 'Pickup';
-    if (v === 'cod') return 'Cash on Delivery';
-    if (v === 'pay_later') return 'Pay Later';
-    return v || '—';
+    return '—';
   }
 
   const PCROVER_STORE_ADDRESS = '770 Sitio 4 Laot, Bahay Pare, Candaba, 2013 Pampanga';

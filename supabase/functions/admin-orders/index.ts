@@ -33,10 +33,15 @@ Deno.serve(async (req) => {
       .select("id,name");
     if (profileError) return json({ error: profileError.message }, 500, corsHeaders);
 
+    const { data: userRows, error: usersError } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (usersError) return json({ error: usersError.message }, 500, corsHeaders);
+
     const nameById = new Map<string, string>((profiles ?? []).map((p) => [p.id, p.name]));
+    const emailById = new Map<string, string>((userRows?.users ?? []).map((u) => [u.id, u.email || ""]));
     const enriched = (orders ?? []).map((o) => ({
       ...o,
       customer_name: o.customer_name || nameById.get(o.user_id) || null,
+      email: o.email || emailById.get(o.user_id) || "",
     }));
     return json({ orders: enriched }, 200, corsHeaders);
   }

@@ -1334,6 +1334,15 @@ function cancelInfo(o) {
     };
   }
 
+  function paymentLabel(pm) {
+    const v = String(pm || '').trim().toLowerCase();
+    if (v === 'gcash') return 'GCash';
+    if (v === 'pickup') return 'Pickup';
+    if (v === 'cod') return 'Cash on Delivery';
+    if (v === 'pay_later') return 'Pay Later';
+    return v || '—';
+  }
+
   const PCROVER_STORE_ADDRESS = '770 Sitio 4 Laot, Bahay Pare, Candaba, 2013 Pampanga';
 
   async function resolveOrderEmail(order) {
@@ -1442,7 +1451,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     const cancelRows = isCancelled
       ? '<div class="modal-info-row"><span class="modal-label">Cancelled by</span><span>' + esc(cInfo.who) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer reason</span><span>' + esc(cInfo.custReason || '—') + '</span></div><div class="modal-info-row"><span class="modal-label">Admin reason</span><span>' + esc(cInfo.adminReason || '—') + '</span></div>'
       : '';
-    body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + esc(order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + esc(order.date) + ' ' + esc(order.time) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + esc(order.customer) + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + esc(order.address) + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + esc(order.phone) + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + esc(order.email) + '</span></div>' + cancelRows + '<h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
+    body.innerHTML = '<div class="modal-info-row"><span class="modal-label">Order Code</span><span>#' + esc(order.code || order.id) + '</span></div><div class="modal-info-row"><span class="modal-label">Date & Time</span><span>' + esc(order.date) + ' ' + esc(order.time) + '</span></div><div class="modal-info-row"><span class="modal-label">Customer</span><span>' + esc(order.customer) + '</span></div><div class="modal-info-row"><span class="modal-label">Address</span><span>' + esc(order.address) + '</span></div><div class="modal-info-row"><span class="modal-label">Phone</span><span>' + esc(order.phone) + '</span></div><div class="modal-info-row"><span class="modal-label">Email</span><span>' + esc(order.email) + '</span></div><div class="modal-info-row"><span class="modal-label">Payment Method</span><span>' + esc(paymentLabel(order.payment_method)) + '</span></div>' + cancelRows + '<h4 style="margin:16px 0 8px;color:var(--pc-blue);">Products Ordered</h4><table class="modal-items-table"><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>' + itemsHtml + '</tbody><tfoot><tr><td colspan="3"><strong>Total Amount</strong></td><td><strong>' + fmtCurrency(order.amount) + '</strong></td></tr></tfoot></table>';
     const closeBtn = '<button class="btn btn-secondary" onclick="closeOrderModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Close</button>';
     if (isCancelled) footer.innerHTML = closeBtn + (order.refunded_at
       ? '<span class="refunded-badge">Refunded ' + esc(refundLabel(order.refunded_at)) + '</span>'

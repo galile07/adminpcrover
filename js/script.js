@@ -1336,40 +1336,57 @@ function cancelInfo(o) {
 
   const PCROVER_STORE_ADDRESS = '770 Sitio 4 Laot, Bahay Pare, Candaba, 2013 Pampanga';
 
-  function composeOrderEmail(order, type) {
-    const email = String((order && order.email) || '').trim();
-    if (!email) { showToast('This order has no email address to notify.', 'error'); return; }
-    const code = String((order && (order.code || order.id)) || '');
-    let subject, body;
-    if (type === 'accepted') {
-      subject = 'PC Rover – Your order #' + code + ' has been accepted';
-      body = 'Hello ' + (order.customer || 'there') + ',\n\n'
-        + 'Your order no. "' + code + '" has been accepted.\n\n'
-        + '-PC Rover team';
-    } else if (type === 'declined') {
-      subject = 'PC Rover – Your order #' + code + ' has been declined';
-      body = 'Hello ' + (order.customer || 'there') + ',\n\n'
-        + 'Your order no. "' + code + '" has been declined.\n'
-        + 'Copy the order code and contact us for the full payment process.\n\n'
-        + '-PC Rover team';
-    } else if (type === 'ready') {
-      subject = 'PC Rover – Your order #' + code + ' is ready for delivery';
-      body = 'Hello ' + (order.customer || 'there') + ',\n\n'
-        + 'Your order no. "' + code + '" is now ready for delivery.\n';
-      const pm = String(order.payment_method || '').toLowerCase();
-      if (pm === 'pickup') {
-        body += 'Go to our physical store ' + PCROVER_STORE_ADDRESS + ' to claim your item.\n';
+  async function resolveOrderEmail(order) {
+    const cached = String((order && order.email) || '').trim();
+    if (cached) return cached;
+    if (!order || !order.id || !sbClient || !sbClient.functions) return '';
+    try {
+      const { data, error } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
+      if (error) return '';
+      const fresh = ((data && data.orders) || []).find(o => o.id === order.id);
+      return String((fresh && fresh.email) || '').trim();
+    } catch (e) { return ''; }
+  }
+
+  async function composeOrderEmail(order, type) {
+    try {
+      const email = await resolveOrderEmail(order);
+      if (!email) { showToast('This order has no email address to notify.', 'error'); return; }
+      const code = String((order && (order.code || order.id)) || '');
+      let subject, body;
+      if (type === 'accepted') {
+        subject = 'PC Rover – Your order #' + code + ' has been accepted';
+        body = 'Hello ' + (order.customer || 'there') + ',\n\n'
+          + 'Your order no. "' + code + '" has been accepted.\n\n'
+          + '-PC Rover team';
+      } else if (type === 'declined') {
+        subject = 'PC Rover – Your order #' + code + ' has been declined';
+        body = 'Hello ' + (order.customer || 'there') + ',\n\n'
+          + 'Your order no. "' + code + '" has been declined.\n'
+          + 'Copy the order code and contact us for the full payment process.\n\n'
+          + '-PC Rover team';
+      } else if (type === 'ready') {
+        subject = 'PC Rover – Your order #' + code + ' is ready for delivery';
+        body = 'Hello ' + (order.customer || 'there') + ',\n\n'
+          + 'Your order no. "' + code + '" is now ready for delivery.\n';
+        const pm = String(order.payment_method || '').toLowerCase();
+        if (pm === 'pickup') {
+          body += 'Go to our physical store ' + PCROVER_STORE_ADDRESS + ' to claim your item.\n';
+        }
+        body += '\n-PC Rover team';
+      } else {
+        return;
       }
-      body += '\n-PC Rover team';
-    } else {
-      return;
+      const mailto = 'mailto:' + email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+      const a = document.createElement('a');
+      a.href = mailto; a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error('composeOrderEmail failed:', e);
+      showToast('Could not open the email app for this order.', 'error');
     }
-    const mailto = 'mailto:' + email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    const a = document.createElement('a');
-    a.href = mailto; a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
   }
 
   function orderTs(o) {
@@ -1480,6 +1497,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
     showToast('Order marked as to be delivered.', 'success');
+    if (o) composeOrderEmail(o, 'ready');
   };
   window.finishOrder = async (id) => {
     const r = await callOrdersFn('finish', id);
@@ -1488,9 +1506,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     if (o) { o.status = 'completed'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
-refreshNavNotifications();
-    showToast('Order marked as to be delivered.', 'success');
-    if (o) composeOrderEmail(o, 'ready');
+    refreshNavNotifications();
+    showToast('Order marked as finished.', 'success');
   };
 
   let _cancelTargetId = null;

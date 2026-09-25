@@ -1357,7 +1357,7 @@ function cancelInfo(o) {
       body = 'Hello ' + (order.customer || 'there') + ',\n\n'
         + 'Your order no. "' + code + '" is now ready for delivery.\n';
       const pm = String(order.payment_method || '').toLowerCase();
-      if (pm === 'gcash' || pm === 'pickup') {
+      if (pm === 'pickup') {
         body += 'Go to our physical store ' + PCROVER_STORE_ADDRESS + ' to claim your item.\n';
       }
       body += '\n-PC Rover team';

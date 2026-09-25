@@ -1297,6 +1297,7 @@ if (ordersContainer && filterTabs.length > 0) {
           id: o.id, code: String(o.id || '').toUpperCase().slice(0, 8),
           customer: pickName(o.customer_name) || 'Customer', address: o.address || '',
           phone: o.phone || '', email: o.email || '',
+          payment_method: o.payment_method || '',
           amount: o.total || 0,
           status: String(o.status || 'pending').toLowerCase(),
           date: dt.date, time: dt.time,
@@ -1331,6 +1332,43 @@ function cancelInfo(o) {
       custReason,
       reason: isAdmin ? adminReason : custReason
     };
+  }
+
+  const PCROVER_STORE_ADDRESS = '770 Sitio 4 Laot, Bahay Pare, Candaba, 2013 Pampanga';
+
+  function composeOrderEmail(order, type) {
+    const email = String((order && order.email) || '').trim();
+    if (!email) { showToast('This order has no email address to notify.', 'error'); return; }
+    const code = String((order && (order.code || order.id)) || '');
+    let subject, body;
+    if (type === 'accepted') {
+      subject = 'PC Rover – Your order #' + code + ' has been accepted';
+      body = 'Hello ' + (order.customer || 'there') + ',\n\n'
+        + 'Your order no. "' + code + '" has been accepted.\n\n'
+        + '-PC Rover team';
+    } else if (type === 'declined') {
+      subject = 'PC Rover – Your order #' + code + ' has been declined';
+      body = 'Hello ' + (order.customer || 'there') + ',\n\n'
+        + 'Your order no. "' + code + '" has been declined.\n'
+        + 'Copy the order code and contact us for the full payment process.\n\n'
+        + '-PC Rover team';
+    } else if (type === 'ready') {
+      subject = 'PC Rover – Your order #' + code + ' is ready for delivery';
+      body = 'Hello ' + (order.customer || 'there') + ',\n\n'
+        + 'Your order no. "' + code + '" is now ready for delivery.\n';
+      if (String(order.payment_method || '').toLowerCase() === 'gcash') {
+        body += 'Go to our physical store ' + PCROVER_STORE_ADDRESS + ' to claim your item.\n';
+      }
+      body += '\n-PC Rover team';
+    } else {
+      return;
+    }
+    const mailto = 'mailto:' + email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    const a = document.createElement('a');
+    a.href = mailto; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   }
 
   function orderTs(o) {
@@ -1420,6 +1458,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     closeOrderModal();
     refreshNavNotifications();
     showToast('Order accepted.', 'success');
+    if (o) composeOrderEmail(o, 'accepted');
   };
   window.declineOrder = async (id) => {
     const r = await callOrdersFn('decline', id);
@@ -1430,6 +1469,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     closeOrderModal();
     refreshNavNotifications();
     showToast('Order declined.', 'success');
+    if (o) composeOrderEmail(o, 'declined');
   };
   window.deliverOrder = async (id) => {
     const r = await callOrdersFn('deliver', id);
@@ -1447,8 +1487,9 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     if (o) { o.status = 'completed'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
-    refreshNavNotifications();
-    showToast('Order marked as finished.', 'success');
+refreshNavNotifications();
+    showToast('Order marked as to be delivered.', 'success');
+    if (o) composeOrderEmail(o, 'ready');
   };
 
   let _cancelTargetId = null;
@@ -1474,6 +1515,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     refreshNavNotifications();
     showToast('Order cancelled.', 'success');
+    if (o) composeOrderEmail(o, 'declined');
   };
 
   window.__refreshOrders = async () => {

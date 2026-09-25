@@ -1363,6 +1363,7 @@ function cancelInfo(o) {
         subject = 'PC Rover – Your order #' + code + ' has been declined';
         body = 'Hello ' + (order.customer || 'there') + ',\n\n'
           + 'Your order no. "' + code + '" has been declined.\n'
+          + 'Reason: ' + (order.cancelled_reason || 'No reason given') + '\n'
           + 'Copy the order code and contact us for the full payment process.\n\n'
           + '-PC Rover team';
       } else if (type === 'ready') {
@@ -1447,8 +1448,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
       ? '<span class="refunded-badge">Refunded ' + esc(refundLabel(order.refunded_at)) + '</span>'
       : '<button class="btn btn-refund" onclick="refundOrder(\'' + order.id + '\')">Mark as Refunded</button>');
     else if (order.status === 'pending') footer.innerHTML = '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="acceptOrder(\'' + order.id + '\')">Accept</button>';
-    else if (order.status === 'shipped') footer.innerHTML = closeBtn + '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
-    else if (order.status === 'delivered') footer.innerHTML = closeBtn + '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
+    else if (order.status === 'shipped') footer.innerHTML = closeBtn + '<button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
+    else if (order.status === 'delivered') footer.innerHTML = closeBtn + '<button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
     else footer.innerHTML = closeBtn;
     modal.style.display = 'flex';
   };

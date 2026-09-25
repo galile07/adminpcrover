@@ -1356,7 +1356,8 @@ function cancelInfo(o) {
       subject = 'PC Rover – Your order #' + code + ' is ready for delivery';
       body = 'Hello ' + (order.customer || 'there') + ',\n\n'
         + 'Your order no. "' + code + '" is now ready for delivery.\n';
-      if (String(order.payment_method || '').toLowerCase() === 'gcash') {
+      const pm = String(order.payment_method || '').toLowerCase();
+      if (pm === 'gcash' || pm === 'pickup') {
         body += 'Go to our physical store ' + PCROVER_STORE_ADDRESS + ' to claim your item.\n';
       }
       body += '\n-PC Rover team';

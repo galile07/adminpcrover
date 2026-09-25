@@ -1377,12 +1377,11 @@ function cancelInfo(o) {
       } else {
         return;
       }
-      const mailto = 'mailto:' + email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-      const a = document.createElement('a');
-      a.href = mailto; a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email)
+        + '&su=' + encodeURIComponent(subject)
+        + '&body=' + encodeURIComponent(body);
+      const win = window.open(gmailUrl, '_blank');
+      if (!win) window.location.href = gmailUrl;
     } catch (e) {
       console.error('composeOrderEmail failed:', e);
       showToast('Could not open the email app for this order.', 'error');

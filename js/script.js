@@ -458,7 +458,7 @@ const posGrid = document.querySelector('.pos-grid');
       sub += item.price * item.qty;
       const d = document.createElement('div');
       d.className = 'pos-cart-item';
-      d.innerHTML = '<div class="pos-cart-item-details"><span class="pos-cart-item-name">' + esc(item.name) + '</span><span class="pos-cart-item-price">' + fmtCurrency(item.price) + '</span></div><div class="pos-cart-qty"><button class="pos-qty-btn pos-qty-set" onclick="setQty(' + i + ')" title="Tap to change quantity">' + item.qty + '</button></div>';
+      d.innerHTML = '<button class="pos-cart-remove" onclick="removeCartItem(' + i + ')" title="Remove ' + esc(item.name) + '">&times;</button><div class="pos-cart-item-details"><span class="pos-cart-item-name" title="' + esc(item.name) + '">' + esc(item.name) + '</span><span class="pos-cart-item-price">' + fmtCurrency(item.price) + '</span></div><div class="pos-cart-qty"><button class="pos-qty-btn pos-qty-set" onclick="setQty(' + i + ')" title="Tap to change quantity">' + item.qty + '</button></div>';
       cartList.appendChild(d);
     });
     _pendingTotal = sub;
@@ -478,6 +478,14 @@ checkoutBtn.onclick = () => {
     item.qty += d;
     if (item.qty <= 0) cart.splice(i, 1);
     updateCartUI();
+  };
+
+  window.removeCartItem = (i) => {
+    const item = cart[i];
+    if (!item) return;
+    cart.splice(i, 1);
+    updateCartUI();
+    showToast(item.name + ' removed from cart.');
   };
 
   let _qtyTarget = -1;

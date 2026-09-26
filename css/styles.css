@@ -926,12 +926,34 @@ button, input { outline: none; border: none; font-family: inherit; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   border-bottom: 1px dashed var(--border);
   padding-bottom: 15px;
 }
 
-.pos-cart-item-details { display: flex; flex-direction: column; }
-.pos-cart-item-name { font-size: 14px; font-weight: 600; }
+.pos-cart-remove {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-white);
+  color: var(--danger, #dc3545);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pos-cart-remove:hover {
+  background: var(--danger, #dc3545);
+  color: #fff;
+}
+
+.pos-cart-item-details { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pos-cart-item-name { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pos-cart-item-price { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
 
 .pos-cart-qty {

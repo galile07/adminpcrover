@@ -1,4 +1,4 @@
-const VERSION = 'pcrover-offline-v1';
+const VERSION = 'pcrover-offline-v2';
 const NAV_CACHE = VERSION + '-nav';
 const STATIC_CACHE = VERSION + '-static';
 
@@ -12,9 +12,7 @@ self.addEventListener('install', function (event) {
           'pos.html',
           'orders.html',
           'inventory.html',
-          'automation.html',
-          'sync.html',
-          'lazada-callback.html'
+          'automation.html'
         ]);
       })
       .catch(function () {})

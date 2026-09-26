@@ -601,8 +601,6 @@ document.getElementById('cashConfirmBtn').onclick = () => {
 const recentOrdersBody = document.getElementById('recentOrdersBody');
 if (recentOrdersBody) {
   const recentOrdersCountEl = document.getElementById('recentOrdersCount');
-  const ordersToAcceptCountEl = document.getElementById('ordersToAcceptCount');
-  const ordersToAcceptMetaEl = document.getElementById('ordersToAcceptMeta');
   const lowStockCountEl = document.getElementById('lowStockCount');
   const lowStockMetaEl = document.getElementById('lowStockMeta');
   const dailySalesValueEl = document.getElementById('dailySalesValue');
@@ -662,8 +660,6 @@ const invProducts = await fetchAll('inventory');
       : '<tr><td colspan="5" style="text-align:center;color:#999;">There\'s nothing here.</td></tr>';
 
     recentOrdersCountEl.innerText = recentOrders.length;
-    ordersToAcceptCountEl.innerText = pendingCount;
-    ordersToAcceptMetaEl.innerText = pendingCount + ' pending confirmations';
 lowStockCountEl.innerText = lowStockItems.length;
     if (pendingCount > 0) setNavBadge('navBadgeOrders', true);
     setNavBadge('navBadgeInventory', lowStockItems.length > 0);
@@ -1281,7 +1277,7 @@ if (ordersContainer && filterTabs.length > 0) {
   (async () => {
     onlineOrders = await fetchOnlineOrders();
     await autoAcceptPending();
-    renderOrders('pending');
+    renderOrders('shipped');
     setInterval(function () { if (window.__refreshOrders) window.__refreshOrders(); }, 20000);
   })();
 

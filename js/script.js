@@ -1260,9 +1260,29 @@ if (ordersContainer && filterTabs.length > 0) {
     } catch (e) { return local; }
   }
 
+  async function autoAcceptPending() {
+    const pending = onlineOrders.filter(o => o.status === 'pending');
+    if (!pending.length) return;
+    let accepted = 0;
+    for (const o of pending) {
+      const r = await callOrdersFn('accept', o.id);
+      if (!r.ok) { console.warn('Auto-accept failed for', o.id, r.error); continue; }
+      await deductStockByName(o.items);
+      o.status = 'shipped';
+      accepted++;
+    }
+    if (accepted) {
+      persistOnlineOrders();
+      refreshNavNotifications();
+      renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
+    }
+  }
+
   (async () => {
     onlineOrders = await fetchOnlineOrders();
+    await autoAcceptPending();
     renderOrders('pending');
+    setInterval(function () { if (window.__refreshOrders) window.__refreshOrders(); }, 20000);
   })();
 
 function cancelInfo(o) {
@@ -1399,7 +1419,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     if (isCancelled) footer.innerHTML = closeBtn + (order.refunded_at
       ? '<span class="refunded-badge">Refunded ' + esc(refundLabel(order.refunded_at)) + '</span>'
       : '<button class="btn btn-refund" onclick="refundOrder(\'' + order.id + '\')">Mark as Refunded</button>');
-    else if (order.status === 'pending') footer.innerHTML = '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button><button class="btn btn-primary" onclick="acceptOrder(\'' + order.id + '\')">Accept</button>';
+    else if (order.status === 'pending') footer.innerHTML = closeBtn + '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button>';
     else if (order.status === 'shipped') footer.innerHTML = closeBtn + '<button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
     else if (order.status === 'delivered') footer.innerHTML = closeBtn + '<button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
     else footer.innerHTML = closeBtn;
@@ -1415,31 +1435,6 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
     showToast('Order marked as refunded.', 'success');
-  };
-  window.acceptOrder = async (id) => {
-    const r = await callOrdersFn('accept', id);
-    if (!r.ok) { showToast('Failed to accept order: ' + r.error, 'error'); return; }
-    const o = onlineOrders.find(x => x.id === id);
-    if (o) {
-      await deductStockByName(o.items);
-      o.status = 'shipped'; persistOnlineOrders();
-    }
-    renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
-    closeOrderModal();
-    refreshNavNotifications();
-    showToast('Order accepted.', 'success');
-    if (o) composeOrderEmail(o, 'accepted');
-  };
-  window.declineOrder = async (id) => {
-    const r = await callOrdersFn('decline', id);
-    if (!r.ok) { showToast('Failed to decline order: ' + r.error, 'error'); return; }
-    const o = onlineOrders.find(x => x.id === id);
-    if (o) { o.status = 'cancelled'; o.cancelled_by = 'seller'; persistOnlineOrders(); }
-    renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
-    closeOrderModal();
-    refreshNavNotifications();
-    showToast('Order declined.', 'success');
-    if (o) composeOrderEmail(o, 'declined');
   };
   window.deliverOrder = async (id) => {
     const r = await callOrdersFn('deliver', id);
@@ -1485,11 +1480,11 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     refreshNavNotifications();
     showToast('Order cancelled.', 'success');
-    if (o) composeOrderEmail(o, 'declined');
   };
 
   window.__refreshOrders = async () => {
     onlineOrders = await fetchOnlineOrders();
+    await autoAcceptPending();
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
   };
 

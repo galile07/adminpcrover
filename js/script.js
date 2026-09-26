@@ -458,7 +458,7 @@ const posGrid = document.querySelector('.pos-grid');
       sub += item.price * item.qty;
       const d = document.createElement('div');
       d.className = 'pos-cart-item';
-      d.innerHTML = '<div class="pos-cart-item-details"><span class="pos-cart-item-name">' + esc(item.name) + '</span><span class="pos-cart-item-price">' + fmtCurrency(item.price) + '</span></div><div class="pos-cart-qty"><button class="pos-qty-btn" onclick="changeQty(' + i + ',-1)">-</button><span>' + item.qty + '</span><button class="pos-qty-btn" onclick="changeQty(' + i + ',1)">+</button></div>';
+      d.innerHTML = '<div class="pos-cart-item-details"><span class="pos-cart-item-name">' + esc(item.name) + '</span><span class="pos-cart-item-price">' + fmtCurrency(item.price) + '</span></div><div class="pos-cart-qty"><button class="pos-qty-btn pos-qty-set" onclick="setQty(' + i + ')" title="Tap to change quantity">' + item.qty + '</button></div>';
       cartList.appendChild(d);
     });
     _pendingTotal = sub;
@@ -478,6 +478,36 @@ checkoutBtn.onclick = () => {
     item.qty += d;
     if (item.qty <= 0) cart.splice(i, 1);
     updateCartUI();
+  };
+
+  let _qtyTarget = -1;
+  window.setQty = (i) => {
+    const item = cart[i];
+    if (!item) return;
+    _qtyTarget = i;
+    document.getElementById('qtyProductName').textContent = item.name;
+    const inp = document.getElementById('qtyInput');
+    inp.value = item.qty;
+    inp.max = item.stock;
+    document.getElementById('qtyHint').textContent = 'Maximum ' + item.stock + ' unit(s) in stock.';
+    document.getElementById('qtyModal').style.display = 'flex';
+    setTimeout(() => inp.focus(), 50);
+  };
+  window.closeQtyModal = () => {
+    document.getElementById('qtyModal').style.display = 'none';
+    _qtyTarget = -1;
+  };
+  window.confirmQty = () => {
+    if (_qtyTarget < 0) return;
+    const item = cart[_qtyTarget];
+    if (!item) { closeQtyModal(); return; }
+    const val = parseInt(document.getElementById('qtyInput').value, 10);
+    if (!val || val < 1) { showToast('Enter a valid quantity.', 'error'); return; }
+    if (val > item.stock) { showToast(item.name + ' only has ' + item.stock + ' unit(s) in stock.', 'error'); return; }
+    item.qty = val;
+    updateCartUI();
+    closeQtyModal();
+    showToast(val + ' ' + item.name + ' has been added', 'success');
   };
 
   // --- Cash Modal ---

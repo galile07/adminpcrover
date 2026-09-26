@@ -953,6 +953,14 @@ button, input { outline: none; border: none; font-family: inherit; }
   justify-content: center;
 }
 
+.pos-qty-set {
+  width: auto;
+  min-width: 44px;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--pc-blue);
+}
+
 .pos-cart-summary {
   padding: 20px;
   background: var(--bg-sub);

@@ -413,6 +413,10 @@ button, input { outline: none; border: none; font-family: inherit; }
   border-left: 3px solid #e74c3c;
 }
 
+.order-card-pickup-ready {
+  border-left: 3px solid var(--pc-blue);
+}
+
 .inventory-search-row {
   margin-bottom: 14px;
 }

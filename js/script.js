@@ -1305,6 +1305,8 @@ function cancelInfo(o) {
     return '—';
   }
 
+  const isPickupOrder = (o) => String((o && o.payment_method) || '').toLowerCase() === 'pickup';
+
   const PCROVER_STORE_ADDRESS = '770 Sitio 4 Laot, Bahay Pare, Candaba, 2013 Pampanga';
 
   async function resolveOrderEmail(order) {
@@ -1381,15 +1383,14 @@ function cancelInfo(o) {
   function renderOrders(filterStatus) {
     const isCancelTab = filterStatus === 'cancelled';
     const isPickupTab = filterStatus === 'pickup';
-    const isPickup = (o) => String(o.payment_method || '').toLowerCase() === 'pickup';
     const searchInput = document.getElementById('orderSearch');
     const q = searchInput ? String(searchInput.value || '').trim().toLowerCase() : '';
     const filtered = onlineOrders
       .filter(o => {
         let st;
         if (isCancelTab) st = (o.status === 'cancelled' || o.status === 'declined');
-        else if (isPickupTab) st = isPickup(o) && !['completed', 'cancelled', 'declined'].includes(o.status);
-        else st = o.status === filterStatus && !isPickup(o);
+        else if (isPickupTab) st = isPickupOrder(o) && !['completed', 'cancelled', 'declined'].includes(o.status);
+        else st = o.status === filterStatus && !isPickupOrder(o);
         if (!st) return false;
         if (q) {
           const code = String(o.code || o.id || '').toLowerCase();
@@ -1403,7 +1404,10 @@ function cancelInfo(o) {
           const cancelMeta = isCancelTab
             ? '<div class="cancel-meta">Cancelled by ' + esc(cancelInfo(order).who) + ' &middot; ' + esc(cancelInfo(order).reason || 'No reason given') + (order.refunded_at ? ' <span class="refunded-chip">Refunded</span>' : '') + '</div>'
             : '';
-          return '<div class="order-card' + (isCancelTab ? ' order-card-cancelled' : '') + '"><div class="order-card-top"><div><span class="order-id">#' + esc(order.code || order.id) + '</span><span class="order-time">' + esc(order.date) + ' ' + esc(order.time) + '</span></div><button class="btn-view" onclick="viewOrder(\'' + esc(order.id) + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + esc(order.customer) + '</div><div class="order-address">' + esc(order.address) + '</div>' + cancelMeta + '</div></div>';
+          const cardCls = isCancelTab
+            ? ' order-card-cancelled'
+            : (isPickupTab && order.status === 'delivered' ? ' order-card-pickup-ready' : '');
+          return '<div class="order-card' + cardCls + '"><div class="order-card-top"><div><span class="order-id">#' + esc(order.code || order.id) + '</span><span class="order-time">' + esc(order.date) + ' ' + esc(order.time) + '</span></div><button class="btn-view" onclick="viewOrder(\'' + esc(order.id) + '\')">View</button></div><div class="order-card-body"><div class="order-customer">' + esc(order.customer) + '</div><div class="order-address">' + esc(order.address) + '</div>' + cancelMeta + '</div></div>';
         }).join('')
       : '<div style="text-align:center;color:var(--text-faint);padding:60px 0;">There\'s nothing here.</div>';
   }
@@ -1424,7 +1428,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
       ? '<span class="refunded-badge">Refunded ' + esc(refundLabel(order.refunded_at)) + '</span>'
       : '<button class="btn btn-refund" onclick="refundOrder(\'' + order.id + '\')">Mark as Refunded</button>');
     else if (order.status === 'pending') footer.innerHTML = closeBtn + '<button class="btn btn-decline" onclick="openCancelModal(\'' + order.id + '\')">Cancel Order</button>';
-    else if (order.status === 'shipped') footer.innerHTML = closeBtn + '<button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">Mark as to be deliver</button>';
+    else if (order.status === 'shipped') footer.innerHTML = closeBtn + '<button class="btn btn-primary" onclick="deliverOrder(\'' + order.id + '\')">' + (isPickupOrder(order) ? 'Mark as for pick up' : 'Mark as to be deliver') + '</button>';
     else if (order.status === 'delivered') footer.innerHTML = closeBtn + '<button class="btn btn-primary" onclick="finishOrder(\'' + order.id + '\')">Order Finished</button>';
     else footer.innerHTML = closeBtn;
     modal.style.display = 'flex';
@@ -1447,7 +1451,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     if (o) { o.status = 'delivered'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
-    showToast('Order marked as to be delivered.', 'success');
+    showToast(isPickupOrder(o) ? 'Order marked as for pick up.' : 'Order marked as to be delivered.', 'success');
     if (o) composeOrderEmail(o, 'ready');
   };
   window.finishOrder = async (id) => {

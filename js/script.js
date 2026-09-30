@@ -209,6 +209,7 @@ async function refreshNavNotifications() {
           const st = String(o.status || '').toLowerCase();
           return st !== 'completed' && st !== 'cancelled' && st !== 'declined';
         }).length;
+        try { await processCancelledRestocks(data.orders); } catch (e) {}
       }
     } catch (e) {}
   }
@@ -220,6 +221,49 @@ async function refreshNavNotifications() {
   } catch (e) {}
   if (gotOrders) setNavBadge('navBadgeOrders', active > 0);
   if (gotInv) setNavBadge('navBadgeInventory', low > 0);
+}
+
+// ==========================================
+// RESTOCK on cancelled orders (return items to inventory)
+// ==========================================
+function readRestockLedger() { try { return JSON.parse(localStorage.getItem('cancelledRestocked') || '[]'); } catch (e) { return []; } }
+function saveRestockLedger(ids) { try { localStorage.setItem('cancelledRestocked', JSON.stringify(ids)); } catch (e) {} }
+
+async function restockReturnedItems(items) {
+  const inv = await fetchAll('inventory');
+  const imp = await fetchAll('imported_products');
+  let changedInv = false, changedImp = false;
+  (items || []).forEach(it => {
+    const qty = Number(it.qty) || 1;
+    const nm = String(it.name || '').trim().toLowerCase();
+    if (!nm) return;
+    const p = inv.find(x => x.name && String(x.name).toLowerCase() === nm);
+    if (p) { p.stock = (Number(p.stock) || 0) + qty; changedInv = true; return; }
+    const pi = imp.find(x => x.name && String(x.name).toLowerCase() === nm);
+    if (pi) { pi.stock = (Number(pi.stock) || 0) + qty; changedImp = true; }
+  });
+  if (changedInv) await upsertAll('inventory', inv);
+  if (changedImp) await upsertAll('imported_products', imp);
+}
+
+async function processCancelledRestocks(orders) {
+  if (!orders || !Array.isArray(orders)) return;
+  let ids = readRestockLedger();
+  const already = (o) => ids.includes(String(o.id));
+  const pending = orders.filter(o => {
+    const st = String(o.status || '').toLowerCase();
+    const by = String(o.cancelled_by || '').trim().toLowerCase();
+    return (st === 'cancelled' || st === 'declined')
+      && by === 'user'
+      && !already(o)
+      && (o.items && o.items.length);
+  });
+  if (!pending.length) return;
+  for (const o of pending) {
+    try { await restockReturnedItems(o.items); } catch (e) { continue; }
+    ids.push(String(o.id));
+  }
+  saveRestockLedger(ids);
 }
 
 // ==========================================
@@ -613,8 +657,15 @@ if (recentOrdersBody) {
     let posOrders = [], onlineOrdersList = [], pendingCount = 0;
     posOrders = (JSON.parse(localStorage.getItem('posOrders') || '[]')).map(o => ({ ...o, type: o.type || 'Walk-in', status: o.status || 'Completed' }));
     const stored = JSON.parse(localStorage.getItem('onlineOrders') || '[]');
+    const cancelFlags = (o) => {
+      const st = String(o.status || '').toLowerCase();
+      return {
+        cancelled: st === 'cancelled' || st === 'declined' || !!(o.cancelled_by || o.cancel_reason || o.cancelled_reason),
+        refunded: !!o.refunded_at
+      };
+    };
     if (!sbClient || !sbClient.functions) {
-      onlineOrdersList = stored.filter(o => String(o.status).toLowerCase() !== 'pending').map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date }));
+      onlineOrdersList = stored.filter(o => String(o.status).toLowerCase() !== 'pending').map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date, ...cancelFlags(o) }));
       pendingCount = stored.filter(o => o.status === 'pending' || o.status === 'Pending').length;
     } else {
       try {
@@ -623,14 +674,14 @@ if (recentOrdersBody) {
           const all = ((data && data.orders) || []).map(o => ({
             id: String(o.id || '').toUpperCase().slice(0, 8),
             customer: o.customer_name || o.name || 'Customer',
-            type: 'Online', amount: o.total || 0, status: o.status, date: (o.created_at || '').slice(0, 10)
+            type: 'Online', amount: o.total || 0, status: o.status, date: (o.created_at || '').slice(0, 10), ...cancelFlags(o)
           }));
           pendingCount = all.filter(o => String(o.status).toLowerCase() === 'pending').length;
           onlineOrdersList = all.filter(o => String(o.status).toLowerCase() !== 'pending');
         }
       } catch (e) {
         pendingCount = stored.filter(o => o.status === 'pending' || o.status === 'Pending').length;
-        onlineOrdersList = stored.filter(o => String(o.status).toLowerCase() !== 'pending').map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date }));
+        onlineOrdersList = stored.filter(o => String(o.status).toLowerCase() !== 'pending').map(o => ({ id: o.code || o.id, customer: o.customer, type: 'Online', amount: o.amount, status: o.status, date: o.date, ...cancelFlags(o) }));
       }
       try {
         const { data: p } = await sb('pos_orders').select('*').order('date', { ascending: false });
@@ -648,15 +699,15 @@ const invProducts = await fetchAll('inventory');
     const impProducts = await fetchAll('imported_products');
     const lowStockItems = [...invProducts, ...impProducts].filter(p => p.enabled && (p.stock || 0) <= (p.threshold || 5));
 
-    // Daily sales: filter today
+    // Daily sales: filter today (cancelled orders only drop out once refunded)
     const today = getTodayStr();
     const todayOrders = recentOrders.filter(o => o.date === today);
-    const dailySales = todayOrders.reduce((s, o) => s + o.amount, 0);
+    const dailySales = todayOrders.reduce((s, o) => s + (o.cancelled && o.refunded ? 0 : o.amount), 0);
 
-    // Monthly sales: filter this month
+    // Monthly sales: filter this month (cancelled orders only drop out once refunded)
     const monthStart = getMonthStart();
     const monthOrders = recentOrders.filter(o => o.date >= monthStart);
-    const monthlySales = monthOrders.reduce((s, o) => s + o.amount, 0);
+    const monthlySales = monthOrders.reduce((s, o) => s + (o.cancelled && o.refunded ? 0 : o.amount), 0);
 
     recentOrdersBody.innerHTML = recentOrders.length
       ? recentOrders.slice(0, 20).map(o => '<tr><td>' + esc(o.date) + '</td><td>#' + esc(o.id || '') + '</td><td>' + esc(o.customer || '-') + '</td><td>' + esc(o.type || '') + ' · ' + esc(o.status || '') + '</td><td>' + fmtCurrency(o.amount) + '</td></tr>').join('')
@@ -1280,6 +1331,7 @@ if (ordersContainer && filterTabs.length > 0) {
   (async () => {
     onlineOrders = await fetchOnlineOrders();
     await autoAcceptPending();
+    await processCancelledRestocks(onlineOrders);
     renderOrders('shipped');
     setInterval(function () { if (window.__refreshOrders) window.__refreshOrders(); }, 20000);
   })();
@@ -1493,6 +1545,7 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
   window.__refreshOrders = async () => {
     onlineOrders = await fetchOnlineOrders();
     await autoAcceptPending();
+    await processCancelledRestocks(onlineOrders);
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
   };
 

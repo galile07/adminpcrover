@@ -199,13 +199,16 @@ function setNavBadge(id, show) {
 }
 async function refreshNavNotifications() {
   if (!document.getElementById('navBadgeOrders') && !document.getElementById('navBadgeInventory')) return;
-  let gotOrders = false, gotInv = false, pending = 0, low = 0;
+  let gotOrders = false, gotInv = false, active = 0, low = 0;
   if (sbClient && sbClient.functions) {
     try {
       const { data, error } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
       if (!error && data && Array.isArray(data.orders)) {
         gotOrders = true;
-        pending = data.orders.filter(o => String(o.status || '').toLowerCase() === 'pending').length;
+        active = data.orders.filter(o => {
+          const st = String(o.status || '').toLowerCase();
+          return st !== 'completed' && st !== 'cancelled' && st !== 'declined';
+        }).length;
       }
     } catch (e) {}
   }
@@ -215,7 +218,7 @@ async function refreshNavNotifications() {
     gotInv = true;
     low = [...inv, ...imp].filter(p => p.enabled && (p.stock || 0) <= (p.threshold || 5)).length;
   } catch (e) {}
-  if (gotOrders) setNavBadge('navBadgeOrders', pending > 0);
+  if (gotOrders) setNavBadge('navBadgeOrders', active > 0);
   if (gotInv) setNavBadge('navBadgeInventory', low > 0);
 }
 
@@ -1377,11 +1380,16 @@ function cancelInfo(o) {
 
   function renderOrders(filterStatus) {
     const isCancelTab = filterStatus === 'cancelled';
+    const isPickupTab = filterStatus === 'pickup';
+    const isPickup = (o) => String(o.payment_method || '').toLowerCase() === 'pickup';
     const searchInput = document.getElementById('orderSearch');
     const q = searchInput ? String(searchInput.value || '').trim().toLowerCase() : '';
     const filtered = onlineOrders
       .filter(o => {
-        const st = isCancelTab ? (o.status === 'cancelled' || o.status === 'declined') : o.status === filterStatus;
+        let st;
+        if (isCancelTab) st = (o.status === 'cancelled' || o.status === 'declined');
+        else if (isPickupTab) st = isPickup(o) && !['completed', 'cancelled', 'declined'].includes(o.status);
+        else st = o.status === filterStatus && !isPickup(o);
         if (!st) return false;
         if (q) {
           const code = String(o.code || o.id || '').toLowerCase();

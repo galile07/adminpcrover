@@ -193,9 +193,12 @@ function ruleAdjustedPrice(product) {
 // ==========================================
 // SIDEBAR NOTIFICATION DOTS
 // ==========================================
-function setNavBadge(id, show) {
+function setNavBadge(id, count) {
   const el = document.getElementById(id);
-  if (el) el.classList.toggle('show', !!show);
+  if (!el) return;
+  const n = Number(count) || 0;
+  if (n > 0) { el.textContent = n > 99 ? '99+' : String(n); el.classList.add('show'); }
+  else { el.textContent = ''; el.classList.remove('show'); }
 }
 async function refreshNavNotifications() {
   if (!document.getElementById('navBadgeOrders') && !document.getElementById('navBadgeInventory')) return;
@@ -219,8 +222,8 @@ async function refreshNavNotifications() {
     gotInv = true;
     low = [...inv, ...imp].filter(p => p.enabled && (p.stock || 0) <= (p.threshold || 5)).length;
   } catch (e) {}
-  if (gotOrders) setNavBadge('navBadgeOrders', active > 0);
-  if (gotInv) setNavBadge('navBadgeInventory', low > 0);
+  if (gotOrders) setNavBadge('navBadgeOrders', active);
+  if (gotInv) setNavBadge('navBadgeInventory', low);
 }
 
 // ==========================================
@@ -715,7 +718,8 @@ const invProducts = await fetchAll('inventory');
 
     recentOrdersCountEl.innerText = recentOrders.length;
 lowStockCountEl.innerText = lowStockItems.length;
-    if (pendingCount > 0) setNavBadge('navBadgeOrders', true);
+    setNavBadge('navBadgeOrders', onlineOrdersList.filter(o => String(o.status || '').toLowerCase() !== 'completed' && !o.cancelled).length);
+    setNavBadge('navBadgeInventory', lowStockItems.length);
     setNavBadge('navBadgeInventory', lowStockItems.length > 0);
     lowStockMetaEl.innerText = lowStockItems.length > 0 ? lowStockItems.length + ' product' + (lowStockItems.length === 1 ? '' : 's') + ' needed to restock' : 'All products well stocked';
     dailySalesValueEl.innerText = fmtCurrency(dailySales);
@@ -871,14 +875,6 @@ if (inventoryTableBody) {
   async function fetchInv() { return await fetchAll('inventory'); }
   async function saveInv(p) { await upsertAll('inventory', p); }
 
-  let _invSource = 'all';
-  window.filterInventory = (source) => {
-    _invSource = source;
-    _invPage = 1;
-    document.querySelectorAll('.sub-nav-item').forEach(b => b.classList.toggle('active', b.dataset.source === source));
-    renderInv();
-  };
-
   let _invPage = 1;
   const INV_PER_PAGE = 10;
 
@@ -923,8 +919,7 @@ if (inventoryTableBody) {
     const imp = await fetchAll('imported_products');
     const fmt = (a) => '₱' + a.toLocaleString('en-US', { minimumFractionDigits: 2 });
     let all = [...inv.map(p => ({ ...p, _src: 'inventory' })), ...imp.map(p => ({ ...p, _src: 'imported' }))];
-    setNavBadge('navBadgeInventory', all.some(p => p.enabled && (p.stock || 0) <= (p.threshold || 5)));
-    if (_invSource !== 'all') all = all.filter(p => p._src === _invSource);
+    setNavBadge('navBadgeInventory', all.filter(p => p.enabled && (p.stock || 0) <= (p.threshold || 5)).length);
 
     const qEl = document.getElementById('inventorySearch');
     const q = qEl ? String(qEl.value || '').trim().toLowerCase() : '';

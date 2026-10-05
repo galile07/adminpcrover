@@ -225,10 +225,16 @@ button, input { outline: none; border: none; font-family: inherit; }
 
 .nav-links .nav-badge {
   display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
   background: #e74c3c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
   margin-right: 6px;
   vertical-align: middle;
   visibility: hidden;
@@ -236,6 +242,7 @@ button, input { outline: none; border: none; font-family: inherit; }
 }
 
 .nav-links .nav-badge.show { visibility: visible; }
+.nav-links .nav-badge:empty { display: none; }
 
 .nav-links .nav-link.active span, 
 .nav-links .nav-link:hover span {

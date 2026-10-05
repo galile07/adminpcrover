@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PCROVER POS</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="stylesheet" href="css/styles.css?v=31" />
+  <link rel="stylesheet" href="css/styles.css?v=32" />
 </head>
 <body>
   <div class="layout-shell">
@@ -21,7 +21,8 @@
         <a href="pos.html" class="nav-link active"><span>POS System</span></a>
         <a href="orders.html" class="nav-link"><span><span class="nav-badge" id="navBadgeOrders"></span>Online Orders</span></a>
         <a href="inventory.html" class="nav-link"><span><span class="nav-badge" id="navBadgeInventory"></span>Inventory</span></a>
-        <a href="automation.html" class="nav-link"><span>Price Automation</span></a>
+        <a href="automation.html" class="nav-link"><span>Price Automation</span></a>
+        <a href="gcash.html" class="nav-link"><span>GCash Payment</span></a>
       </nav>
     </aside>
 
@@ -84,6 +85,54 @@
       </div>
     </div>
   </div>
+  <!-- Payment method modal -->
+  <div id="payMethodModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:360px;">
+      <div class="modal-header">
+        <h3>Payment Method</h3>
+        <button class="modal-close" onclick="closePayMethodModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="payMethodTotal" style="font-size:26px;font-weight:700;color:var(--pc-blue);margin:0 0 4px;text-align:center;"></p>
+        <p style="font-size:12px;color:var(--text-faint);margin:0 0 18px;text-align:center;">How would you like to pay?</p>
+        <div style="display:flex;gap:12px;">
+          <button class="pay-method-btn" onclick="choosePayMethod('cash')">
+            <span class="pay-method-icon">&#8369;</span>
+            <span class="pay-method-label">Cash</span>
+          </button>
+          <button class="pay-method-btn pay-method-btn-gcash" onclick="choosePayMethod('gcash')">
+            <span class="pay-method-icon">&#9633;</span>
+            <span class="pay-method-label">GCash</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closePayMethodModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
+      </div>
+    </div>
+  </div>
+  <!-- GCash payment modal -->
+  <div id="gcashPayModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width:380px;">
+      <div class="modal-header">
+        <h3>GCash Payment</h3>
+        <button class="modal-close" onclick="closeGcashPayModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <p id="gcashPayTotal" style="font-size:26px;font-weight:700;color:var(--pc-blue);margin:0 0 14px;"></p>
+        <img id="gcashPayQr" class="gcash-qr" alt="GCash QR code">
+        <p class="gcash-pay-owner">Scan and pay the exact amount above</p>
+        <div class="gcash-pay-details">
+          <p><span>Name</span><strong id="gcashPayName">-</strong></p>
+          <p><span>Number</span><strong id="gcashPayPhone">-</strong></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeGcashPayModal()" style="color:var(--text-muted);border:1px solid var(--border-strong);background:transparent;padding:10px 24px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">Cancel</button>
+        <button class="btn btn-primary" onclick="confirmGcashPayment()">Complete Transaction</button>
+      </div>
+    </div>
+  </div>
   <!-- Quantity popup -->
   <div id="qtyModal" class="modal-overlay" style="display:none;">
     <div class="modal-box" style="max-width:340px;">
@@ -110,6 +159,6 @@
   </div>
 
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=60"></script>
+  <script src="js/script.js?v=61"></script>
 </body>
 </html>

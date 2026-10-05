@@ -1,4 +1,4 @@
-const VERSION = 'pcrover-offline-v3';
+const VERSION = 'pcrover-offline-v4';
 const NAV_CACHE = VERSION + '-nav';
 const STATIC_CACHE = VERSION + '-static';
 
@@ -12,7 +12,8 @@ self.addEventListener('install', function (event) {
           'pos.html',
           'orders.html',
           'inventory.html',
-          'automation.html'
+          'automation.html',
+          'gcash.html'
         ]);
       })
       .catch(function () {})

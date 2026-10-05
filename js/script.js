@@ -424,6 +424,126 @@ if (loginForm) {
 }
 
 // ==========================================
+// 1b. GCASH PAYMENT SETTINGS
+// ==========================================
+const GCASH_KEY = 'gcashSettings';
+const GCASH_HISTORY_KEY = 'gcashHistory';
+
+function getGcashSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(GCASH_KEY) || '{}');
+    return { name: String(s.name || ''), phone: String(s.phone || ''), qr: s.qr || '', updatedAt: s.updatedAt || '' };
+  } catch (e) { return { name: '', phone: '', qr: '', updatedAt: '' }; }
+}
+
+function getGcashHistory() {
+  try {
+    const h = JSON.parse(localStorage.getItem(GCASH_HISTORY_KEY) || '[]');
+    return Array.isArray(h) ? h : [];
+  } catch (e) { return []; }
+}
+
+function sanitizeGcashName(v) { return String(v == null ? '' : v).replace(/[^A-Za-z.]/g, ''); }
+function sanitizeGcashPhone(v) { return String(v == null ? '' : v).replace(/[^0-9]/g, '').slice(0, 11); }
+
+function shrinkImage(file, maxSize, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+        const width = Math.max(1, Math.round(img.width * scale));
+        const height = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality || 0.85));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+const gcashPage = document.getElementById('gcashPage');
+if (gcashPage) {
+  const nameEl = document.getElementById('gcashName');
+  const phoneEl = document.getElementById('gcashPhone');
+  const qrInput = document.getElementById('gcashQrInput');
+  const qrImg = document.getElementById('gcashQrPreview');
+  const qrEmpty = document.getElementById('gcashQrEmpty');
+  const saveBtn = document.getElementById('gcashSaveBtn');
+  let pendingQr = null;
+
+  function paintQr(dataUrl) {
+    if (dataUrl) { qrImg.src = dataUrl; qrImg.style.display = 'block'; qrEmpty.style.display = 'none'; }
+    else { qrImg.removeAttribute('src'); qrImg.style.display = 'none'; qrEmpty.style.display = 'block'; }
+  }
+
+  (function loadGcashPage() {
+    const s = getGcashSettings();
+    nameEl.value = s.name;
+    phoneEl.value = s.phone;
+    paintQr(s.qr);
+  })();
+
+  nameEl.addEventListener('input', () => { nameEl.value = sanitizeGcashName(nameEl.value); });
+  phoneEl.addEventListener('input', () => { phoneEl.value = sanitizeGcashPhone(phoneEl.value); });
+
+  qrInput.addEventListener('change', async () => {
+    const file = qrInput.files && qrInput.files[0];
+    if (!file) return;
+    try {
+      pendingQr = await shrinkImage(file, 700, 0.85);
+      paintQr(pendingQr);
+      showToast('QR photo loaded. Click Save to apply.');
+    } catch (e) { showToast('Could not read that image file.', 'error'); }
+  });
+
+  saveBtn.addEventListener('click', () => {
+    const name = sanitizeGcashName(nameEl.value);
+    const phone = sanitizeGcashPhone(phoneEl.value);
+    if (!name) { showToast('Enter the GCash name (letters and period only).', 'error'); return; }
+    if (phone.length !== 11) { showToast('Enter an 11-digit GCash number.', 'error'); return; }
+    const current = getGcashSettings();
+    const qr = pendingQr !== null ? pendingQr : current.qr;
+    if (!qr) { showToast('Upload the GCash QR code photo.', 'error'); return; }
+
+    const changes = [];
+    if (current.name !== name) changes.push({ field: 'Name', from: current.name || '(empty)', to: name });
+    if (current.phone !== phone) changes.push({ field: 'Number', from: current.phone || '(empty)', to: phone });
+    if (pendingQr !== null && pendingQr !== current.qr) changes.push({ field: 'QR photo', from: current.qr ? 'Previous photo' : '(none)', to: 'New photo' });
+
+    localStorage.setItem(GCASH_KEY, JSON.stringify({ name, phone, qr, updatedAt: new Date().toISOString() }));
+    if (changes.length) {
+      const history = getGcashHistory();
+      history.unshift({ ts: new Date().toISOString(), changes });
+      localStorage.setItem(GCASH_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
+    }
+    pendingQr = null;
+    qrInput.value = '';
+    showToast(changes.length ? 'GCash settings saved (' + changes.length + ' change' + (changes.length > 1 ? 's' : '') + ' recorded).' : 'GCash settings saved.', 'success');
+  });
+
+  window.openGcashHistory = () => {
+    const list = document.getElementById('gcashHistoryList');
+    const history = getGcashHistory();
+    list.innerHTML = history.length
+      ? history.map(h => {
+          const when = new Date(h.ts);
+          const stamp = isNaN(when.getTime()) ? String(h.ts) : when.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+          return '<li><div class="gcash-history-when">' + esc(stamp) + '</div><ul>' + (h.changes || []).map(c => '<li>' + esc(c.field) + ': <span class="gcash-history-from">' + esc(c.from) + '</span> &rarr; <span class="gcash-history-to">' + esc(c.to) + '</span></li>').join('') + '</ul></li>';
+        }).join('')
+      : '<li class="gcash-history-empty">No changes recorded yet.</li>';
+    document.getElementById('gcashHistoryModal').style.display = 'flex';
+  };
+  window.closeGcashHistory = () => { document.getElementById('gcashHistoryModal').style.display = 'none'; };
+}
+
+// ==========================================
 // 2. POS
 // ==========================================
 const cartList = document.querySelector('.pos-cart-list');
@@ -517,7 +637,7 @@ const posGrid = document.querySelector('.pos-grid');
     checkoutBtn.innerText = 'Pay Now ' + fmtCurrency(sub);
 checkoutBtn.onclick = () => {
       if (cart.length === 0) { showToast('Cart is empty!', 'error'); return; }
-      openCashModal(sub);
+      openPayMethodModal(sub);
     };
 }
 
@@ -568,26 +688,9 @@ checkoutBtn.onclick = () => {
     showToast(val + ' ' + item.name + ' has been added', 'success');
   };
 
-  // --- Cash Modal ---
-  window.openCashModal = (total) => {
-    document.getElementById('cashTotalDisplay').textContent = fmtCurrency(total);
-    document.getElementById('cashReceived').value = '';
-    document.getElementById('cashChangeGroup').style.display = 'none';
-    document.getElementById('cashModal').style.display = 'flex';
-    document.getElementById('cashReceived').oninput = function() {
-      const rec = parseFloat(this.value) || 0;
-      if (rec >= total) {
-        document.getElementById('cashChangeGroup').style.display = 'block';
-        document.getElementById('cashChangeDisplay').textContent = fmtCurrency(rec - total);
-      } else {
-        document.getElementById('cashChangeGroup').style.display = 'none';
-      }
-    };
-document.getElementById('cashConfirmBtn').onclick = () => {
-      const rec = parseFloat(document.getElementById('cashReceived').value) || 0;
-      if (rec < total) { showToast('Amount received is less than total.', 'error'); return; }
-      showConfirm('Complete payment of ' + fmtCurrency(total) + '?', () => void (async () => {
-      try {
+  // --- Shared transaction completion ---
+  async function completePosTransaction(total, method, doneMsg) {
+    try {
       const inv = await fetchAll('inventory');
       const imp = await fetchAll('imported_products');
       cart.forEach(item => {
@@ -606,6 +709,7 @@ document.getElementById('cashConfirmBtn').onclick = () => {
         customer: 'Walk-in Customer', type: 'Walk-in',
         amount: total, status: 'Completed',
         date: getTodayStr(),
+        payment_method: method,
         _syncUid: _genUid(),
         pendingSync: true
       };
@@ -630,12 +734,67 @@ document.getElementById('cashConfirmBtn').onclick = () => {
       };
       if (navigator.onLine === false) localStorage.setItem('_posStockDirty', '1');
       if (!(await tryInsert())) updatePosSyncBanner();
-      showToast('Transaction completed! Change: ' + fmtCurrency(rec - total), 'success');
-      } catch(e) { showToast('Transaction failed: ' + (e.message || 'Unknown error'), 'error'); }
-      closeCashModal();
-      cart = [];
-      updateCartUI();
-      })());
+      showToast(doneMsg || 'Transaction completed!', 'success');
+    } catch(e) { showToast('Transaction failed: ' + (e.message || 'Unknown error'), 'error'); }
+    closeCashModal();
+    closeGcashPayModal();
+    closePayMethodModal();
+    cart = [];
+    updateCartUI();
+  }
+
+  // --- Payment method step ---
+  window.openPayMethodModal = (total) => {
+    document.getElementById('payMethodTotal').textContent = fmtCurrency(total);
+    document.getElementById('payMethodModal').style.display = 'flex';
+  };
+  window.closePayMethodModal = () => { document.getElementById('payMethodModal').style.display = 'none'; };
+  window.choosePayMethod = (method) => {
+    const total = _pendingTotal;
+    closePayMethodModal();
+    if (method === 'cash') { openCashModal(total); return; }
+    openGcashPayModal(total);
+  };
+
+  // --- GCash payment ---
+  window.openGcashPayModal = (total) => {
+    const s = getGcashSettings();
+    if (!s.name || !s.phone || !s.qr) {
+      showToast('Set up your GCash name, number and QR photo first in GCash Payment settings.', 'error');
+      return;
+    }
+    document.getElementById('gcashPayTotal').textContent = fmtCurrency(total);
+    document.getElementById('gcashPayQr').src = s.qr;
+    document.getElementById('gcashPayName').textContent = s.name;
+    document.getElementById('gcashPayPhone').textContent = s.phone;
+    document.getElementById('gcashPayModal').style.display = 'flex';
+  };
+  window.closeGcashPayModal = () => { document.getElementById('gcashPayModal').style.display = 'none'; };
+  window.confirmGcashPayment = () => {
+    const total = _pendingTotal;
+    closeGcashPayModal();
+    showConfirm('Complete GCash payment of ' + fmtCurrency(total) + '?', () => void completePosTransaction(total, 'gcash', 'GCash transaction completed!'));
+  };
+
+  // --- Cash Modal ---
+  window.openCashModal = (total) => {
+    document.getElementById('cashTotalDisplay').textContent = fmtCurrency(total);
+    document.getElementById('cashReceived').value = '';
+    document.getElementById('cashChangeGroup').style.display = 'none';
+    document.getElementById('cashModal').style.display = 'flex';
+    document.getElementById('cashReceived').oninput = function() {
+      const rec = parseFloat(this.value) || 0;
+      if (rec >= total) {
+        document.getElementById('cashChangeGroup').style.display = 'block';
+        document.getElementById('cashChangeDisplay').textContent = fmtCurrency(rec - total);
+      } else {
+        document.getElementById('cashChangeGroup').style.display = 'none';
+      }
+    };
+    document.getElementById('cashConfirmBtn').onclick = () => {
+      const rec = parseFloat(document.getElementById('cashReceived').value) || 0;
+      if (rec < total) { showToast('Amount received is less than total.', 'error'); return; }
+      showConfirm('Complete payment of ' + fmtCurrency(total) + '?', () => void completePosTransaction(total, 'cash', 'Transaction completed! Change: ' + fmtCurrency(rec - total)));
     };
   };
 

@@ -244,6 +244,71 @@ button, input { outline: none; border: none; font-family: inherit; }
 .nav-links .nav-badge.show { visibility: visible; }
 .nav-links .nav-badge:empty { display: none; }
 
+/* Payment method chooser */
+.pay-method-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-white);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.pay-method-btn:hover { border-color: var(--pc-blue); background: rgba(0, 123, 255, 0.06); }
+.pay-method-icon { font-size: 22px; font-weight: 700; color: var(--pc-blue); }
+.pay-method-label { font-size: 14px; font-weight: 600; color: var(--text-dark); }
+.pay-method-btn-gcash .pay-method-icon { color: #00874f; }
+
+/* GCash */
+.gcash-qr {
+  width: 240px;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.gcash-pay-owner { font-size: 12px; color: var(--text-faint); margin: 10px 0 12px; }
+
+.gcash-pay-details {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.gcash-pay-details p { margin: 0; font-size: 13px; color: var(--text-muted); }
+.gcash-pay-details span { display: block; font-size: 11px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.5px; }
+.gcash-pay-details strong { font-size: 15px; color: var(--text-dark); }
+
+.gcash-card { max-width: 560px; }
+.field-hint { font-size: 12px; color: var(--text-faint); margin: 6px 0 0; }
+
+.gcash-qr-box {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.gcash-qr-empty { font-size: 13px; color: var(--text-faint); margin: 0; }
+
+.gcash-history-list { list-style: none; margin: 0; padding: 0; max-height: 380px; overflow-y: auto; }
+.gcash-history-list > li { border-bottom: 1px solid var(--border); padding: 10px 0; }
+.gcash-history-list > li:last-child { border-bottom: none; }
+.gcash-history-when { font-size: 12px; font-weight: 600; color: var(--pc-blue); margin-bottom: 4px; }
+.gcash-history-list ul { list-style: none; margin: 0; padding: 0; }
+.gcash-history-list ul li { font-size: 13px; color: var(--text-muted); }
+.gcash-history-from { color: var(--text-faint); text-decoration: line-through; }
+.gcash-history-to { color: var(--text-dark); font-weight: 600; }
+.gcash-history-empty { font-size: 13px; color: var(--text-faint); }
+
 .nav-links .nav-link.active span, 
 .nav-links .nav-link:hover span {
   text-decoration: underline;

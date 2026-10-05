@@ -1,4 +1,4 @@
-const VERSION = 'pcrover-offline-v4';
+const VERSION = 'pcrover-offline-v5';
 const NAV_CACHE = VERSION + '-nav';
 const STATIC_CACHE = VERSION + '-static';
 

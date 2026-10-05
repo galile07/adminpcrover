@@ -25,15 +25,27 @@ setTimeout(() => {
 // ==========================================
 // HELPERS: backend / localStorage
 // ==========================================
+// Product tables are read network-first so a stale device cache can never
+// overwrite newer server-side data (e.g. migrated image URLs) on upsert.
+// A short TTL keeps rapid re-renders (search typing) from spamming the API.
+const NETWORK_FIRST_TABLES = ['inventory', 'imported_products'];
+const NET_FIRST_TTL_MS = 60000;
+const _netFirstAt = {};
 async function fetchAll(table) {
   const raw = localStorage.getItem(table);
   const local = raw ? JSON.parse(raw) : null;
-  if (local && local.length) return local;
   if (!sbClient) return local || [];
+  const networkFirst = NETWORK_FIRST_TABLES.indexOf(table) !== -1;
+  if (local && local.length) {
+    if (!networkFirst) return local;
+    if (Date.now() - (_netFirstAt[table] || 0) < NET_FIRST_TTL_MS) return local;
+  }
   try {
     const { data, error } = await sb(table).select('*').order('id');
     if (error) throw error;
+    _netFirstAt[table] = Date.now();
     if (data && data.length) { localStorage.setItem(table, JSON.stringify(data)); return data; }
+    if (networkFirst) { localStorage.setItem(table, '[]'); return []; }
     return [];
   } catch(e) { return local || []; }
 }
@@ -50,6 +62,56 @@ async function deleteAll(table) {
   if (!sbClient) { localStorage.setItem(table, '[]'); return; }
   try { const r = await sb(table).delete().neq('id', 0); if (r.error) throw r.error; }
   catch(e) { localStorage.setItem(table, '[]'); }
+}
+
+// ==========================================
+// SUPABASE STORAGE HELPERS
+// ==========================================
+const PRODUCT_BUCKET = 'productbucket';
+const GCASH_BUCKET = 'gcashbucket';
+function storagePublicUrl(bucket, path) { return SUPABASE_URL + '/storage/v1/object/public/' + bucket + '/' + path; }
+function storageUniquePath(prefix, ext) {
+  return prefix + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.' + (ext || 'jpg');
+}
+async function storageUpload(bucket, path, blob, contentType) {
+  const res = await fetch(SUPABASE_URL + '/storage/v1/object/' + bucket + '/' + path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': contentType || blob.type || 'application/octet-stream',
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+      'x-upsert': 'true'
+    },
+    body: blob
+  });
+  if (!res.ok) throw new Error('upload failed (' + res.status + ')');
+  return storagePublicUrl(bucket, path);
+}
+async function storageUploadImage(bucket, prefix, file, maxSize, quality) {
+  const shrunk = await shrinkImage(file, maxSize || 600, quality || 0.82);
+  const blob = await (await fetch(shrunk)).blob();
+  return storageUpload(bucket, storageUniquePath(prefix, 'jpg'), blob, 'image/jpeg');
+}
+async function storageUploadDataUrl(bucket, prefix, dataUrl) {
+  const blob = await (await fetch(dataUrl)).blob();
+  return storageUpload(bucket, storageUniquePath(prefix, 'jpg'), blob, 'image/jpeg');
+}
+async function storageUploadJson(bucket, path, value) {
+  const blob = new Blob([JSON.stringify(value)], { type: 'application/json' });
+  return storageUpload(bucket, path, blob, 'application/json');
+}
+async function storageReadJson(bucket, path) {
+  const res = await fetch(storagePublicUrl(bucket, path), { cache: 'no-store' });
+  if (!res.ok) throw new Error('read failed (' + res.status + ')');
+  return await res.json();
+}
+function storageDelete(bucket, publicUrl) {
+  const m = String(publicUrl || '').match(new RegExp('/storage/v1/object/public/' + bucket + '/([^?#]+)$'));
+  if (!m) return Promise.resolve(false);
+  return fetch(SUPABASE_URL + '/storage/v1/object/' + bucket + '/' + m[1], {
+    method: 'DELETE',
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }
+  }).then(function (res) { return res.ok; }).catch(function () { return false; });
 }
 
 // ==========================================
@@ -428,6 +490,8 @@ if (loginForm) {
 // ==========================================
 const GCASH_KEY = 'gcashSettings';
 const GCASH_HISTORY_KEY = 'gcashHistory';
+const GCASH_SETTINGS_FILE = 'settings.json';
+const GCASH_HISTORY_FILE = 'history.json';
 
 function getGcashSettings() {
   try {
@@ -435,12 +499,40 @@ function getGcashSettings() {
     return { name: String(s.name || ''), phone: String(s.phone || ''), qr: s.qr || '', updatedAt: s.updatedAt || '' };
   } catch (e) { return { name: '', phone: '', qr: '', updatedAt: '' }; }
 }
+function setGcashSettings(s) { localStorage.setItem(GCASH_KEY, JSON.stringify(s)); }
 
 function getGcashHistory() {
   try {
     const h = JSON.parse(localStorage.getItem(GCASH_HISTORY_KEY) || '[]');
     return Array.isArray(h) ? h : [];
   } catch (e) { return []; }
+}
+function setGcashHistory(h) { localStorage.setItem(GCASH_HISTORY_KEY, JSON.stringify((h || []).slice(0, 50))); }
+
+// Pulls the shared copy from gcashbucket so every device sees the same
+// GCash name/number/QR. Local cache stays for instant + offline reads.
+async function loadGcashRemote() {
+  let remote;
+  try { remote = await storageReadJson(GCASH_BUCKET, GCASH_SETTINGS_FILE); }
+  catch (e) { return null; }
+  if (!remote || typeof remote !== 'object') return null;
+  const local = getGcashSettings();
+  let changed = false;
+  if (remote.name !== undefined && String(remote.name || '') !== local.name) { local.name = String(remote.name || ''); changed = true; }
+  if (remote.phone !== undefined && String(remote.phone || '') !== local.phone) { local.phone = String(remote.phone || ''); changed = true; }
+  if (remote.qrUrl && remote.qrUrl !== local.qr) { local.qr = remote.qrUrl; changed = true; }
+  if (remote.updatedAt && remote.updatedAt !== local.updatedAt) { local.updatedAt = remote.updatedAt; changed = true; }
+  if (changed) setGcashSettings(local);
+  try {
+    const rh = await storageReadJson(GCASH_BUCKET, GCASH_HISTORY_FILE);
+    if (Array.isArray(rh) && rh.length) {
+      const lh = getGcashHistory();
+      const rNewest = rh[0] && rh[0].ts ? String(rh[0].ts) : '';
+      const lNewest = lh[0] && lh[0].ts ? String(lh[0].ts) : '';
+      if (rNewest && rNewest > lNewest) setGcashHistory(rh);
+    }
+  } catch (e) {}
+  return changed ? local : null;
 }
 
 function sanitizeGcashName(v) { return String(v == null ? '' : v).replace(/[^A-Za-z.]/g, ''); }
@@ -488,6 +580,13 @@ if (gcashPage) {
     nameEl.value = s.name;
     phoneEl.value = s.phone;
     paintQr(s.qr);
+    loadGcashRemote().then((fresh) => {
+      if (!fresh) return;
+      nameEl.value = fresh.name;
+      phoneEl.value = fresh.phone;
+      paintQr(fresh.qr);
+      showToast('Loaded the shared GCash settings from this device.');
+    });
   })();
 
   nameEl.addEventListener('input', () => { nameEl.value = sanitizeGcashName(nameEl.value); });
@@ -509,23 +608,45 @@ if (gcashPage) {
     if (!name) { showToast('Enter the GCash name (letters and period only).', 'error'); return; }
     if (phone.length !== 11) { showToast('Enter an 11-digit GCash number.', 'error'); return; }
     const current = getGcashSettings();
-    const qr = pendingQr !== null ? pendingQr : current.qr;
+    const hasNewQr = pendingQr !== null && pendingQr !== current.qr;
+    const qr = hasNewQr ? pendingQr : current.qr;
     if (!qr) { showToast('Upload the GCash QR code photo.', 'error'); return; }
 
     const changes = [];
     if (current.name !== name) changes.push({ field: 'Name', from: current.name || '(empty)', to: name });
     if (current.phone !== phone) changes.push({ field: 'Number', from: current.phone || '(empty)', to: phone });
-    if (pendingQr !== null && pendingQr !== current.qr) changes.push({ field: 'QR photo', from: current.qr ? 'Previous photo' : '(none)', to: 'New photo' });
+    if (hasNewQr) changes.push({ field: 'QR photo', from: current.qr ? 'Previous photo' : '(none)', to: 'New photo' });
 
-    localStorage.setItem(GCASH_KEY, JSON.stringify({ name, phone, qr, updatedAt: new Date().toISOString() }));
-    if (changes.length) {
-      const history = getGcashHistory();
-      history.unshift({ ts: new Date().toISOString(), changes });
-      localStorage.setItem(GCASH_HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
-    }
-    pendingQr = null;
-    qrInput.value = '';
-    showToast(changes.length ? 'GCash settings saved (' + changes.length + ' change' + (changes.length > 1 ? 's' : '') + ' recorded).' : 'GCash settings saved.', 'success');
+    saveBtn.disabled = true;
+    const finishLocal = (qrValue) => {
+      pendingQr = null;
+      qrInput.value = '';
+      saveBtn.disabled = false;
+      paintQr(qrValue);
+    };
+
+    const qrUpload = hasNewQr ? storageUploadDataUrl(GCASH_BUCKET, 'gcash-qr', qr) : Promise.resolve(current.qr);
+    qrUpload
+      .then((qrUrl) => {
+        const payload = { name, phone, qrUrl, updatedAt: new Date().toISOString() };
+        return storageUploadJson(GCASH_BUCKET, GCASH_SETTINGS_FILE, payload).then(() => {
+          if (!changes.length) return null;
+          const history = getGcashHistory();
+          history.unshift({ ts: payload.updatedAt, changes });
+          setGcashHistory(history);
+          return storageUploadJson(GCASH_BUCKET, GCASH_HISTORY_FILE, getGcashHistory()).catch(() => null);
+        }).then(() => {
+          setGcashSettings({ name, phone, qr: qrUrl, updatedAt: payload.updatedAt });
+          if (current.qr && current.qr !== qrUrl) storageDelete(GCASH_BUCKET, current.qr);
+          finishLocal(qrUrl);
+          showToast(changes.length ? 'GCash settings saved to all devices (' + changes.length + ' change' + (changes.length > 1 ? 's' : '') + ' recorded).' : 'GCash settings saved to all devices.', 'success');
+        });
+      })
+      .catch(() => {
+        setGcashSettings({ name, phone, qr, updatedAt: new Date().toISOString() });
+        finishLocal(qr);
+        showToast('Saved on this device only — GCash settings storage is unreachable.', 'error');
+      });
   });
 
   window.openGcashHistory = () => {
@@ -541,6 +662,14 @@ if (gcashPage) {
     document.getElementById('gcashHistoryModal').style.display = 'flex';
   };
   window.closeGcashHistory = () => { document.getElementById('gcashHistoryModal').style.display = 'none'; };
+}
+
+// Keep the local GCash cache in sync with the shared copy so POS on any
+// device shows the current QR/name/number without visiting settings.
+if (!gcashPage) {
+  loadGcashRemote().then(function (fresh) {
+    if (fresh) window.dispatchEvent(new CustomEvent('gcash-settings-updated', { detail: fresh }));
+  });
 }
 
 // ==========================================
@@ -1036,6 +1165,8 @@ if (inventoryTableBody) {
 
   let _invPage = 1;
   const INV_PER_PAGE = 10;
+  let _pendingImageFile = null;
+  let _pendingImportImageFile = null;
 
   function invLowRank(p) {
     return p.enabled && (p.stock || 0) <= (p.threshold || 5) ? 0 : 1;
@@ -1137,8 +1268,11 @@ window.toggleProduct = async (id) => {
     showConfirm('Delete this product permanently?', () => void (async () => {
       try {
         let products = await fetchInv();
+        const removed = products.find(p => p.id === parseInt(id));
         products = products.filter(p => p.id !== parseInt(id));
         await saveInv(products);
+        if (removed && removed.image) storageDelete(PRODUCT_BUCKET, removed.image);
+        _pendingImageFile = null;
         renderInv();
         closeProductModal();
         showToast('Product deleted.', 'success');
@@ -1158,18 +1292,17 @@ window.toggleProduct = async (id) => {
     document.getElementById('imagePreview').style.display = 'none';
     document.getElementById('imagePreview').innerHTML = '';
     document.getElementById('deleteProductBtn').style.display = 'none';
+    _pendingImageFile = null;
     document.getElementById('productModal').style.display = 'flex';
   };
   window.closeProductModal = () => { document.getElementById('productModal').style.display = 'none'; };
   window.previewImage = (event) => {
-    const file = event.target.files[0];
+    const file = event.target.files && event.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const p = document.getElementById('imagePreview');
-      p.style.display = 'block'; p.innerHTML = '<img src="' + e.target.result + '">';
-    };
-    reader.readAsDataURL(file);
+    _pendingImageFile = file;
+    const p = document.getElementById('imagePreview');
+    p.style.display = 'block';
+    p.innerHTML = '<img src="' + URL.createObjectURL(file) + '">';
   };
 window.saveProduct = () => {
     const id = document.getElementById('editProductId').value;
@@ -1179,21 +1312,28 @@ window.saveProduct = () => {
     const stock = parseInt(document.getElementById('productStock').value);
     const threshold = parseInt(document.getElementById('productThreshold').value);
     const enabled = document.getElementById('productEnabled').value === 'checked';
-    const preview = document.getElementById('imagePreview');
-    const imgSrc = preview.querySelector('img') ? preview.querySelector('img').src : '';
     if (!name || isNaN(price) || isNaN(stock) || isNaN(threshold)) { showToast('Please fill all fields.', 'error'); return; }
     const isEdit = !!id;
     showConfirm(isEdit ? 'Save changes to "' + name + '"?' : 'Add "' + name + '" to inventory?', () => void (async () => {
       try {
         const products = await fetchInv();
+        const existing = id ? products.find(x => x.id === parseInt(id)) : null;
+        const previousImage = existing ? (existing.image || '') : '';
+        let imageValue = previousImage;
+        if (_pendingImageFile) {
+          try { imageValue = await storageUploadImage(PRODUCT_BUCKET, 'product', _pendingImageFile, 600, 0.82); }
+          catch (e) { imageValue = await shrinkImage(_pendingImageFile, 600, 0.82); }
+        }
         if (id) {
           const p = products.find(x => x.id === parseInt(id));
-          if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.threshold = threshold; p.enabled = enabled; p.category = guessCategory(name); if (imgSrc) p.image = imgSrc; }
+          if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.threshold = threshold; p.enabled = enabled; p.category = guessCategory(name); if (imageValue) p.image = imageValue; }
         } else {
           const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1;
-          products.push({ id: newId, name, description, price, stock, threshold, enabled, image: imgSrc, category: guessCategory(name) });
+          products.push({ id: newId, name, description, price, stock, threshold, enabled, image: imageValue, category: guessCategory(name) });
         }
         await saveInv(products);
+        if (previousImage && previousImage !== imageValue) storageDelete(PRODUCT_BUCKET, previousImage);
+        _pendingImageFile = null;
         renderInv();
         closeProductModal();
         showToast(isEdit ? 'Product updated.' : 'Product added.', 'success');
@@ -1217,6 +1357,7 @@ window.saveProduct = () => {
     if (p.image) { preview.style.display = 'block'; preview.innerHTML = '<img src="' + p.image + '">'; }
     else { preview.style.display = 'none'; preview.innerHTML = ''; }
     document.getElementById('productImage').value = '';
+    _pendingImageFile = null;
     document.getElementById('productModal').style.display = 'flex';
   };
 
@@ -1275,9 +1416,22 @@ showToast(skipped ? msg + ' (' + skipped + ' duplicate' + (skipped > 1 ? 's' : '
     document.getElementById('importProductPrice').value = p.price;
     document.getElementById('importProductStock').value = p.stock;
     document.getElementById('importProductEnabled').value = p.enabled ? 'checked' : '';
+    document.getElementById('importProductImage').value = '';
+    _pendingImportImageFile = null;
+    const preview = document.getElementById('importImagePreview');
+    if (p.image) { preview.style.display = 'block'; preview.innerHTML = '<img src="' + p.image + '">'; }
+    else { preview.style.display = 'none'; preview.innerHTML = ''; }
     document.getElementById('importProductModal').style.display = 'flex';
   };
 window.closeImportProductModal = () => { document.getElementById('importProductModal').style.display = 'none'; };
+  window.previewImportImage = (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    _pendingImportImageFile = file;
+    const p = document.getElementById('importImagePreview');
+    p.style.display = 'block';
+    p.innerHTML = '<img src="' + URL.createObjectURL(file) + '">';
+  };
   window.saveImportProduct = () => {
     const id = document.getElementById('editImportProductId').value;
     const name = document.getElementById('importProductName').value.trim();
@@ -1290,9 +1444,23 @@ window.closeImportProductModal = () => { document.getElementById('importProductM
     showConfirm(isEdit ? 'Save changes to "' + name + '"?' : 'Add "' + name + '" to inventory?', () => void (async () => {
       try {
         const products = await fetchAll('imported_products');
-        if (id) { const p = products.find(x => x.id === parseInt(id));       if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.enabled = enabled; p.category = guessCategory(name); } }
-        else { const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1; products.push({ id: newId, name, description, price, stock, enabled: enabled, threshold: 5, image: '', category: guessCategory(name) }); }
+        const existing = id ? products.find(x => x.id === parseInt(id)) : null;
+        const previousImage = existing ? (existing.image || '') : '';
+        let imageValue = previousImage;
+        if (_pendingImportImageFile) {
+          try { imageValue = await storageUploadImage(PRODUCT_BUCKET, 'product', _pendingImportImageFile, 600, 0.82); }
+          catch (e) { imageValue = await shrinkImage(_pendingImportImageFile, 600, 0.82); }
+        }
+        if (id) {
+          const p = products.find(x => x.id === parseInt(id));
+          if (p) { p.name = name; p.description = description; p.price = price; p.stock = stock; p.enabled = enabled; p.category = guessCategory(name); if (imageValue) p.image = imageValue; }
+        } else {
+          const newId = products.length > 0 ? Math.max(...products.map(x => x.id)) + 1 : 1;
+          products.push({ id: newId, name, description, price, stock, enabled: enabled, threshold: 5, image: imageValue, category: guessCategory(name) });
+        }
         await upsertAll('imported_products', products);
+        if (previousImage && previousImage !== imageValue) storageDelete(PRODUCT_BUCKET, previousImage);
+        _pendingImportImageFile = null;
         renderInv();
         closeImportProductModal();
         showToast(isEdit ? 'Product updated.' : 'Product added.', 'success');

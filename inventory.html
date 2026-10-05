@@ -140,6 +140,11 @@
                 </div>
               </div>
               <input type="hidden" id="importProductEnabled" value="checked">
+              <div class="form-group">
+                <label>Product Image</label>
+                <input type="file" id="importProductImage" class="form-input" accept="image/*" onchange="previewImportImage(event)">
+                <div id="importImagePreview" class="image-preview"></div>
+              </div>
             </form>
           </div>
           <div class="modal-footer">
@@ -152,7 +157,7 @@
     </main>
   </div>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="js/script.js?v=61"></script>
+  <script src="js/script.js?v=62"></script>
 </body>
 </html>
 

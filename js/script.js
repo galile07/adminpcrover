@@ -943,7 +943,7 @@ if (inventoryTableBody) {
 const imgHtml = '<img src="' + productImage(p, 200) + '" class="inv-thumb" alt="' + esc(p.name) + '" loading="lazy">';
       return '<tr>' +
         '<td>' + imgHtml + '</td>' +
-        '<td><strong>' + esc(p.name) + '</strong>' + (p._src === 'imported' ? ' <span style="font-size:11px;color:#999;">(imported)</span>' : '') + '</td>' +
+        '<td><strong>' + esc(p.name) + '</strong></td>' +
         '<td>' + esc(p.category || guessCategory(p.name)) + '</td>' +
         '<td>' + (isRuleAdjusted(p) ? '<span class="price-rule" title="Price automation is active for this product">' + fmt(ruleAdjustedPrice(p)) + '</span><div class="price-base">' + fmt(p.price) + '</div>' : fmt(p.price)) + '</td>' +
         '<td>' + p.stock + '</td>' +

@@ -1582,7 +1582,19 @@ if (ordersContainer && filterTabs.length > 0) {
       if (error) throw error;
       return { ok: true, data: data || null };
     } catch (e) {
-      const msg = (e && (e.message || (e.context && e.context.message))) || String(e);
+      let msg = (e && (e.message || (e.context && e.context.message))) || String(e);
+      try {
+        const ctx = e && e.context;
+        if (ctx && typeof ctx.text === 'function') {
+          const body = await ctx.text();
+          if (body) {
+            let detail = body;
+            try { const parsed = JSON.parse(body); if (parsed && parsed.error) detail = parsed.error; } catch (ignore) {}
+            detail = String(detail).slice(0, 160);
+            if (detail && detail !== msg) msg = detail;
+          }
+        }
+      } catch (ignore) {}
       console.error('admin-orders call failed:', msg);
       return { ok: false, error: msg };
     }

@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
 
     const { data: current, error: readError } = await supabase
       .from("orders")
-      .select("id,status,user_id,email,payment_method,customer_name")
+      .select("*")
       .eq("id", order_id)
       .maybeSingle();
     if (readError) return json({ error: readError.message }, 500, corsHeaders);

@@ -275,6 +275,7 @@ async function refreshNavNotifications() {
           return st !== 'completed' && st !== 'cancelled' && st !== 'declined';
         }).length;
         try { await processCancelledRestocks(data.orders); } catch (e) {}
+        autoAcceptFromOrders(data.orders).catch(() => {});
       }
     } catch (e) {}
   }
@@ -1518,6 +1519,98 @@ window.closeImportProductModal = () => { document.getElementById('importProductM
   } catch (e) {}
 })();
 // ==========================================
+// 4b. SHARED ORDER HELPERS + GLOBAL AUTO-ACCEPT
+// ==========================================
+function toNum(v) { return parseFloat(String(v ?? '').replace(/[^0-9.\-]/g, '')) || 0; }
+
+function parseOrderItems(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map(i => ({ name: i.name || i.item || 'Item', qty: i.qty || 1, price: toNum(i.price) || toNum(i.value) || 0 }));
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parseOrderItems(parsed);
+    } catch (e) {}
+    return raw.split(',').filter(Boolean).map(i => ({ name: i.trim(), qty: 1, price: 0 }));
+  }
+  return [];
+}
+
+async function deductStockByName(items) {
+  const inv = await fetchAll('inventory');
+  const imp = await fetchAll('imported_products');
+  let changedInv = false, changedImp = false;
+  (items || []).forEach(it => {
+    const qty = it.qty || 1;
+    const nm = String(it.name || '').trim().toLowerCase();
+    if (!nm) return;
+    const p = inv.find(x => x.name && String(x.name).toLowerCase() === nm);
+    if (p) { p.stock = Math.max(0, (p.stock || 0) - qty); changedInv = true; return; }
+    const pi = imp.find(x => x.name && String(x.name).toLowerCase() === nm);
+    if (pi) { pi.stock = Math.max(0, (pi.stock || 0) - qty); changedImp = true; }
+  });
+  if (changedInv) await upsertAll('inventory', inv);
+  if (changedImp) await upsertAll('imported_products', imp);
+}
+
+async function callOrdersFn(action, order_id, extra) {
+  if (!sbClient || !sbClient.functions) return { ok: false, error: 'Supabase client not ready' };
+  try {
+    const { data, error } = await sbClient.functions.invoke('admin-orders', {
+      method: action ? 'POST' : 'GET',
+      body: action ? { action, order_id, ...(extra || {}) } : undefined
+    });
+    if (error) throw error;
+    return { ok: true, data: data || null };
+  } catch (e) {
+    let msg = (e && (e.message || (e.context && e.context.message))) || String(e);
+    try {
+      const ctx = e && e.context;
+      if (ctx && typeof ctx.text === 'function') {
+        const body = await ctx.text();
+        if (body) {
+          let detail = body;
+          try { const parsed = JSON.parse(body); if (parsed && parsed.error) detail = parsed.error; } catch (ignore) {}
+          detail = String(detail).slice(0, 160);
+          if (detail && detail !== msg) msg = detail;
+        }
+      }
+    } catch (ignore) {}
+    console.error('admin-orders call failed:', msg);
+    return { ok: false, error: msg };
+  }
+}
+
+// Accepts every pending order in the given list. The server guards the
+// status transition, so a concurrent runner gets "already" or 409 and
+// stock is deducted exactly once per order.
+async function autoAcceptFromOrders(orders) {
+  const pending = (orders || []).filter(o => String(o.status || '').toLowerCase() === 'pending');
+  if (!pending.length) return 0;
+  let accepted = 0;
+  for (const o of pending) {
+    const r = await callOrdersFn('accept', o.id);
+    if (!r.ok) { console.warn('Auto-accept failed for', o.id, r.error); continue; }
+    if (r.data && r.data.already) continue;
+    await deductStockByName(parseOrderItems(o.items));
+    accepted++;
+  }
+  return accepted;
+}
+
+async function autoAcceptTick() {
+  if (!sbClient || !sbClient.functions) return;
+  try {
+    const { data, error } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
+    if (error) throw error;
+    const n = await autoAcceptFromOrders((data && data.orders) || []);
+    if (n) { try { await refreshNavNotifications(); } catch (e) {} }
+  } catch (e) {}
+}
+
+// ==========================================
 // 5. ONLINE ORDERS
 // ==========================================
 const ordersContainer = document.getElementById('ordersContainer');
@@ -1525,8 +1618,6 @@ const filterTabs = document.querySelectorAll('.sub-nav-item');
 
 if (ordersContainer && filterTabs.length > 0) {
   let onlineOrders = [];
-
-  function toNum(v) { return parseFloat(String(v ?? '').replace(/[^0-9.\-]/g, '')) || 0; }
 
   function pickName(v) {
     if (!v) return '';
@@ -1536,68 +1627,8 @@ if (ordersContainer && filterTabs.length > 0) {
     return String(v);
   }
 
-  function parseOrderItems(raw) {
-    if (!raw) return [];
-    if (Array.isArray(raw)) {
-      return raw.map(i => ({ name: i.name || i.item || 'Item', qty: i.qty || 1, price: toNum(i.price) || toNum(i.value) || 0 }));
-    }
-    if (typeof raw === 'string') {
-      try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parseOrderItems(parsed);
-      } catch (e) {}
-      return raw.split(',').filter(Boolean).map(i => ({ name: i.trim(), qty: 1, price: 0 }));
-    }
-    return [];
-  }
-
   function persistOnlineOrders() {
     localStorage.setItem('onlineOrders', JSON.stringify(onlineOrders));
-  }
-
-  async function deductStockByName(items) {
-    const inv = await fetchAll('inventory');
-    const imp = await fetchAll('imported_products');
-    let changedInv = false, changedImp = false;
-    (items || []).forEach(it => {
-      const qty = it.qty || 1;
-      const nm = String(it.name || '').trim().toLowerCase();
-      if (!nm) return;
-      const p = inv.find(x => x.name && String(x.name).toLowerCase() === nm);
-      if (p) { p.stock = Math.max(0, (p.stock || 0) - qty); changedInv = true; return; }
-      const pi = imp.find(x => x.name && String(x.name).toLowerCase() === nm);
-      if (pi) { pi.stock = Math.max(0, (pi.stock || 0) - qty); changedImp = true; }
-    });
-    if (changedInv) await upsertAll('inventory', inv);
-    if (changedImp) await upsertAll('imported_products', imp);
-  }
-
-  async function callOrdersFn(action, order_id, extra) {
-    if (!sbClient || !sbClient.functions) return { ok: false, error: 'Supabase client not ready' };
-    try {
-      const { data, error } = await sbClient.functions.invoke('admin-orders', {
-        method: action ? 'POST' : 'GET',
-        body: action ? { action, order_id, ...(extra || {}) } : undefined
-      });
-      if (error) throw error;
-      return { ok: true, data: data || null };
-    } catch (e) {
-      let msg = (e && (e.message || (e.context && e.context.message))) || String(e);
-      try {
-        const ctx = e && e.context;
-        if (ctx && typeof ctx.text === 'function') {
-          const body = await ctx.text();
-          if (body) {
-            let detail = body;
-            try { const parsed = JSON.parse(body); if (parsed && parsed.error) detail = parsed.error; } catch (ignore) {}
-            detail = String(detail).slice(0, 160);
-            if (detail && detail !== msg) msg = detail;
-          }
-        }
-      } catch (ignore) {}
-      console.error('admin-orders call failed:', msg);
-      return { ok: false, error: msg };
-    }
   }
 
   function emailOutcomeSuffix(data) {
@@ -1659,6 +1690,7 @@ if (ordersContainer && filterTabs.length > 0) {
     for (const o of pending) {
       const r = await callOrdersFn('accept', o.id);
       if (!r.ok) { console.warn('Auto-accept failed for', o.id, r.error); continue; }
+      if (r.data && r.data.already) { o.status = 'shipped'; continue; }
       await deductStockByName(o.items);
       o.status = 'shipped';
       accepted++;
@@ -1950,6 +1982,13 @@ window.toggleRule = async (id) => {
 setTimeout(function () { refreshNavNotifications(); }, 1600);
 setTimeout(function () { refreshNavNotifications(); }, 4000);
 setInterval(function () { refreshNavNotifications(); }, 12 * 60 * 1000);
+
+// Global: auto-accept pending orders from any admin page (orders.html has
+// its own faster 20s refresh, so the light tick only runs elsewhere).
+if (!document.getElementById('ordersContainer')) {
+  setTimeout(function () { autoAcceptTick(); }, 3000);
+  setInterval(function () { autoAcceptTick(); }, 45000);
+}
 
 
 

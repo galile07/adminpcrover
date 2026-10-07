@@ -1575,17 +1575,25 @@ if (ordersContainer && filterTabs.length > 0) {
   async function callOrdersFn(action, order_id, extra) {
     if (!sbClient || !sbClient.functions) return { ok: false, error: 'Supabase client not ready' };
     try {
-      const { error } = await sbClient.functions.invoke('admin-orders', {
+      const { data, error } = await sbClient.functions.invoke('admin-orders', {
         method: action ? 'POST' : 'GET',
         body: action ? { action, order_id, ...(extra || {}) } : undefined
       });
       if (error) throw error;
-      return { ok: true };
+      return { ok: true, data: data || null };
     } catch (e) {
       const msg = (e && (e.message || (e.context && e.context.message))) || String(e);
       console.error('admin-orders call failed:', msg);
       return { ok: false, error: msg };
     }
+  }
+
+  function emailOutcomeSuffix(data) {
+    if (!data) return { text: '', level: 'success' };
+    if (data.email_sent) return { text: ' Customer notified by email.', level: 'success' };
+    if (data.email_error === 'no email address') return { text: ' This order has no email address.', level: 'success' };
+    if (data.email_error) return { text: ' Email failed: ' + data.email_error, level: 'error' };
+    return { text: '', level: 'success' };
   }
 
   function orderDateTime(iso) {
@@ -1681,61 +1689,6 @@ function cancelInfo(o) {
 
   const isPickupOrder = (o) => String((o && o.payment_method) || '').toLowerCase() === 'pickup';
 
-  const PCROVER_STORE_ADDRESS = '770 Sitio 4 Laot, Bahay Pare, Candaba, 2013 Pampanga';
-
-  async function resolveOrderEmail(order) {
-    const cached = String((order && order.email) || '').trim();
-    if (cached) return cached;
-    if (!order || !order.id || !sbClient || !sbClient.functions) return '';
-    try {
-      const { data, error } = await sbClient.functions.invoke('admin-orders', { method: 'GET' });
-      if (error) return '';
-      const fresh = ((data && data.orders) || []).find(o => o.id === order.id);
-      return String((fresh && fresh.email) || '').trim();
-    } catch (e) { return ''; }
-  }
-
-  async function composeOrderEmail(order, type) {
-    try {
-      const email = await resolveOrderEmail(order);
-      if (!email) { showToast('This order has no email address to notify.', 'error'); return; }
-      const code = String((order && (order.code || order.id)) || '');
-      let subject, body;
-      if (type === 'accepted') {
-        subject = 'PC Rover – Your order #' + code + ' has been accepted';
-        body = 'Hello ' + (order.customer || 'there') + ',\n\n'
-          + 'Your order no. "' + code + '" has been accepted.\n\n'
-          + '-PC Rover team';
-      } else if (type === 'declined') {
-        subject = 'PC Rover – Your order #' + code + ' has been declined';
-        body = 'Hello ' + (order.customer || 'there') + ',\n\n'
-          + 'Your order no. "' + code + '" has been declined.\n'
-          + 'Reason: ' + (order.cancelled_reason || 'No reason given') + '\n'
-          + 'Copy the order code and contact us for the full payment process.\n\n'
-          + '-PC Rover team';
-      } else if (type === 'ready') {
-        subject = 'PC Rover – Your order #' + code + ' is ready for delivery';
-        body = 'Hello ' + (order.customer || 'there') + ',\n\n'
-          + 'Your order no. "' + code + '" is now ready for delivery.\n';
-        const pm = String(order.payment_method || '').toLowerCase();
-        if (pm === 'pickup') {
-          body += 'Go to our physical store ' + PCROVER_STORE_ADDRESS + ' to claim your item.\n';
-        }
-        body += '\n-PC Rover team';
-      } else {
-        return;
-      }
-      const gmailUrl = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(email)
-        + '&su=' + encodeURIComponent(subject)
-        + '&body=' + encodeURIComponent(body);
-      const win = window.open(gmailUrl, '_blank');
-      if (!win) window.location.href = gmailUrl;
-    } catch (e) {
-      console.error('composeOrderEmail failed:', e);
-      showToast('Could not open the email app for this order.', 'error');
-    }
-  }
-
   function orderTs(o) {
     if (o.createdAt) {
       const t = new Date(o.createdAt).getTime();
@@ -1825,8 +1778,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     if (o) { o.status = 'delivered'; persistOnlineOrders(); }
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
-    showToast(isPickupOrder(o) ? 'Order marked as for pick up.' : 'Order marked as to be delivered.', 'success');
-    if (o) composeOrderEmail(o, 'ready');
+    const mail = emailOutcomeSuffix(r.data);
+    showToast((isPickupOrder(o) ? 'Order marked as for pick up.' : 'Order marked as to be delivered.') + mail.text, mail.level);
   };
   window.finishOrder = async (id) => {
     const r = await callOrdersFn('finish', id);
@@ -1836,7 +1789,8 @@ const itemsHtml = order.items.map(item => '<tr><td>' + esc(item.name) + '</td><t
     renderOrders(document.querySelector('.sub-nav-item.active').dataset.status);
     closeOrderModal();
     refreshNavNotifications();
-    showToast('Order marked as finished.', 'success');
+    const mail = emailOutcomeSuffix(r.data);
+    showToast('Order marked as finished.' + mail.text, mail.level);
   };
 
   let _cancelTargetId = null;
